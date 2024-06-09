@@ -6,6 +6,11 @@ C Program name.level: RDMSG.01D                              19 February 1997 C
 C Function: Read and print: Monthly Summary Groups (MSG.1)   Author: S.Lubker C
 C NOTE: For more software information, see <soft_info> (electronic document). C
 C=============================================================================C
+C bash | tee MSG2.[year].[month].[day].txt									  C
+C csh rdmsg1_Cshell MSG2.[year].[month].[day].STD							  C
+C echo "$1 `date`" | ./a.out												  C
+C exit																		  C
+C=============================================================================C
       PROGRAM RDMSG
 C READ AND PRINT MSG.1
       IMPLICIT INTEGER(A-E,G-Z)
@@ -56,11 +61,11 @@ C CALL ROUTINE FOR USER ACCESS TO TRUE VALUES (OPTIONAL)
 C      CALL USER(FMISS)
 C
 C STOP AFTER SEVERAL REPORTS HAVE BEEN READ
-      IF(NREC.GE.50)STOP 'REMOVE STOP TO READ ALL REPORTS'
+C      IF(NREC.GE.20)STOP 'REMOVE STOP TO READ ALL REPORTS'
       GOTO 100
 C
 C END OF FILE IF EOF IS NEGATIVE ELSE AN ERROR
-  900 PRINT *,'REPORTS ',NREC,', EOF ',EOF
+  900 PRINT *,'Reports: ',NREC,'* End Of File: ',EOF
       END
 C-----------------------------------------------------------------------3456789
       SUBROUTINE USER(FMISS)
@@ -297,80 +302,89 @@ C
      Y ,496 ,500 ,504 ,508/
 C
       DATA FORMAT(3)
-     +/"(/' YEAR ',F5.0,' MONTH ',F3.0,' BSZ ',F2.0,' BLO ',F5.1,' BLA '
-     +,F5.1,' PID1 ',F6.0,' PID2 ',F6.0,' GRP ',F3.0,' CK ',F6.0/
-     +11X,6X,'S1',6X,'S3',6X,'S5',7X,'M',7X,'N',7X,'S',7X,'D',6X,'HT'
-     +,7X,'X',7X,'Y'/
-     +,' S         ',F8.2,F8.2,F8.2,F8.2,F8.0,F8.2,F8.0,F8.1,F8.1,F8.1/
-     +,' A         ',F8.2,F8.2,F8.2,F8.2,F8.0,F8.2,F8.0,F8.1,F8.1,F8.1/
-     +,' Q         ',F8.2,F8.2,F8.2,F8.2,F8.0,F8.2,F8.0,F8.1,F8.1,F8.1/
-     +,' R         ',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1)
+C		   YEAR     MONTH    		BSZ			  BLO			   BLA
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+C			PID1 (unused)	PID2 (standard/enhanced stats)
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' S         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' A         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' Q         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' R         ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1)
      +"/
 C
       DATA FORMAT(4)
-     +/"(/' YEAR ',F5.0,' MONTH ',F3.0,' BSZ ',F2.0,' BLO ',F5.1,' BLA '
-     +,F5.1,' PID1 ',F6.0,' PID2 ',F6.0,' GRP ',F3.0,' CK ',F6.0/
-     +11X,6X,'S1',6X,'S3',6X,'S5',7X,'M',7X,'N',7X,'S',7X,'D',6X,'HT'
-     +,7X,'X',7X,'Y'/
-     +,' W         ',F8.2,F8.2,F8.2,F8.2,F8.0,F8.2,F8.0,F8.1,F8.1,F8.1/
-     +,' U         ',F8.2,F8.2,F8.2,F8.2,F8.0,F8.2,F8.0,F8.1,F8.1,F8.1/
-     +,' V         ',F8.2,F8.2,F8.2,F8.2,F8.0,F8.2,F8.0,F8.1,F8.1,F8.1/
-     +,' P         ',F8.2,F8.2,F8.2,F8.2,F8.0,F8.2,F8.0,F8.1,F8.1,F8.1)
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' W         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' U         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' V         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' P         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1)
      +"/
 C
       DATA FORMAT(5)
-     +/"(/' YEAR ',F5.0,' MONTH ',F3.0,' BSZ ',F2.0,' BLO ',F5.1,' BLA '
-     +,F5.1,' PID1 ',F6.0,' PID2 ',F6.0,' GRP ',F3.0,' CK ',F6.0/
-     +11X,6X,'S1',6X,'S3',6X,'S5',7X,'M',7X,'N',7X,'S',7X,'D',6X,'HT'
-     +,7X,'X',7X,'Y'/
-     +,' C         ',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1/
-     +,' R         ',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1/
-     +,' X=W*U     ',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1/
-     +,' Y=W*V     ',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1)
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' C         ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' R         ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' X=W*U     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' Y=W*V     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1)
      +"/
 C
       DATA FORMAT(6)
-     +/"(/' YEAR ',F5.0,' MONTH ',F3.0,' BSZ ',F2.0,' BLO ',F5.1,' BLA '
-     +,F5.1,' PID1 ',F6.0,' PID2 ',F6.0,' GRP ',F3.0,' CK ',F6.0/
-     +11X,6X,'S1',6X,'S3',6X,'S5',7X,'M',7X,'N',7X,'S',7X,'D',6X,'HT'
-     +,7X,'X',7X,'Y'/
-     +,' D=S-A     ',F8.2,F8.2,F8.2,F8.2,F8.0,F8.2,F8.0,F8.1,F8.1,F8.1/
-     +,' E=(S-A)*W ',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1/
-     +,' F=QS-Q    ',F8.2,F8.2,F8.2,F8.2,F8.0,F8.2,F8.0,F8.1,F8.1,F8.1/
-     +,' G=(QS-Q)*W',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1)
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' D=S-A     ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' E=(S-A)*W ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' F=QS-Q    ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' G=(QS-Q)*W',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1)
      +"/
 C
       DATA FORMAT(7)
-     +/"(/' YEAR ',F5.0,' MONTH ',F3.0,' BSZ ',F2.0,' BLO ',F5.1,' BLA '
-     +,F5.1,' PID1 ',F6.0,' PID2 ',F6.0,' GRP ',F3.0,' CK ',F6.0/
-     +11X,6X,'S1',6X,'S3',6X,'S5',7X,'M',7X,'N',7X,'S',7X,'D',6X,'HT'
-     +,7X,'X',7X,'Y'/
-     +,' I=U*A     ',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1/
-     +,' J=V*A     ',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1/
-     +,' K=U*Q     ',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1/
-     +,' L=V*Q     ',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1)
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' I=U*A     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' J=V*A     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' K=U*Q     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' L=V*Q     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1)
      +"/
 C
       DATA FORMAT(8)
-     +/"(/' YEAR ',F5.0,' MONTH ',F3.0,' BSZ ',F2.0,' BLO ',F5.1,' BLA '
-     +,F5.1,' PID1 ',F6.0,' PID2 ',F6.0,' GRP ',F3.0,' CK ',F6.0/
-     +11X,6X,'S1',6X,'S3',6X,'S5',7X,'M',7X,'N',7X,'S',7X,'D',6X,'HT'
-     +,7X,'X',7X,'Y'/
-     +,' S         ',F8.2,F8.2,F8.2,F8.2,F8.0,F8.2,F8.0,F8.1,F8.1,F8.1/
-     +,' A         ',F8.2,F8.2,F8.2,F8.2,F8.0,F8.2,F8.0,F8.1,F8.1,F8.1/
-     +,' X=W*U     ',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1/
-     +,' Y=W*V     ',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1)
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' S         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' A         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' X=W*U     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' Y=W*V     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1)
      +"/
 C
       DATA FORMAT(9)
-     +/"(/' YEAR ',F5.0,' MONTH ',F3.0,' BSZ ',F2.0,' BLO ',F5.1,' BLA '
-     +,F5.1,' PID1 ',F6.0,' PID2 ',F6.0,' GRP ',F3.0,' CK ',F6.0/
-     +11X,6X,'S1',6X,'S3',6X,'S5',7X,'M',7X,'N',7X,'S',7X,'D',6X,'HT'
-     +,7X,'X',7X,'Y'/
-     +,' M=(QS-Q)*U',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1/
-     +,' N=(QS-Q)*V',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1/
-     +,' B1=W*W*W  ',F8.1,F8.1,F8.1,F8.1,F8.0,F8.1,F8.0,F8.1,F8.1,F8.1/
-     +,' B2=W*W*W  ',F8.0,F8.0,F8.0,F8.0,F8.0,F8.0,F8.0,F8.1,F8.1,F8.1)
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' M=(QS-Q)*U',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' N=(QS-Q)*V',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' B1=W*W*W  ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' B2=W*W*W  ',F9.0,F9.0,F9.0,F9.0,F9.0,F9.0,F9.0,F9.1,F9.1,F9.1)
      +"/
 C
       DATA RPTID/1/ ,INDXCK/9/
