@@ -10,3 +10,10 @@ Note: this code was tested first on Linux, please make adjustments to your syste
 + Python
   + pandas
   + csv
+
+## How to Use
++ ```bash | tee MSG2.[year].[month].[day].txt```
++ ```csh rdmsg1_Cshell MSG2.[year].[month].[day].STD```
++ ```echo "$1 `date`" | ./a.out```
++ ```exit```
++ ```python3 data_cleaner.py```
