@@ -19,4 +19,4 @@ There are a few commands to run, and they require some setup. I've named folders
 + The terminal will proceed to read the terminal output into a .txt file and save it as a file in the same folder with the same name but with a .txt extension.
 + Once that's done, then, in that same folder, run ``python3 data_cleaner.py``. This will create a bunch of properly formatted csv files with the extracted data. This process usually takes a bit longer.
 + You now have all your data in the form of csvs!
-+ If there are any bugs in the Python code, you can enable verbosity to display what's going on in the terminal.
++ If something isn't working in the Python code, you can enable verbosity in data_cleaner.py on Line 25 to display what's going on in the terminal.
