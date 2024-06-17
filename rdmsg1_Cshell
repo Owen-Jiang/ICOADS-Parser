@@ -6,11 +6,6 @@ C Program name.level: RDMSG.01D                              19 February 1997 C
 C Function: Read and print: Monthly Summary Groups (MSG.1)   Author: S.Lubker C
 C NOTE: For more software information, see <soft_info> (electronic document). C
 C=============================================================================C
-C bash | tee MSG2.[year].[month].[day].txt									  C
-C csh rdmsg1_Cshell MSG2.[year].[month].[day].STD							  C
-C echo "$1 `date`" | ./a.out												  C
-C exit																		  C
-C=============================================================================C
       PROGRAM RDMSG
 C READ AND PRINT MSG.1
       IMPLICIT INTEGER(A-E,G-Z)
@@ -65,7 +60,7 @@ C      IF(NREC.GE.20)STOP 'REMOVE STOP TO READ ALL REPORTS'
       GOTO 100
 C
 C END OF FILE IF EOF IS NEGATIVE ELSE AN ERROR
-  900 PRINT *,'Reports: ',NREC,'* End Of File: ',EOF
+  900 PRINT *,'Reports: ',NREC,'| End Of File: ',EOF
       END
 C-----------------------------------------------------------------------3456789
       SUBROUTINE USER(FMISS)
@@ -303,11 +298,11 @@ C
 C
       DATA FORMAT(3)
 C		   YEAR     MONTH    		BSZ			  BLO			   BLA
-     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+     +/"(/,F5.0,'/',F3.0,' | Box_Size: ',F2.0,'° | Long: ',F5.1,
 C			PID1 (unused)	PID2 (standard/enhanced stats)
-     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
-     +' * Checksum: ',F3.0/
-     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'° | Lat: ',F5.1,'° | ',F1.0,' Enhanced: ',F2.0,' | Group: ',
+     +F3.0,' | Checksum: ',F3.0/
+     +11X,3X,'| & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
      +'Day',3X,'Light%',7X,'+x',7X,'+y'/
      +,' S         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
      +,' A         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
@@ -316,10 +311,10 @@ C			PID1 (unused)	PID2 (standard/enhanced stats)
      +"/
 C
       DATA FORMAT(4)
-     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
-     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
-     +' * Checksum: ',F3.0/
-     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +/"(/,F5.0,'/',F3.0,' | Box_Size: ',F2.0,'° | Long: ',F5.1,
+     +'° | Lat: ',F5.1,'° | ',F1.0,' Enhanced: ',F2.0,' | Group: ',
+     +F3.0,' | Checksum: ',F3.0/
+     +11X,3X,'| & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
      +'Day',3X,'Light%',7X,'+x',7X,'+y'/
      +,' W         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
      +,' U         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
@@ -328,10 +323,10 @@ C
      +"/
 C
       DATA FORMAT(5)
-     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
-     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
-     +' * Checksum: ',F3.0/
-     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +/"(/,F5.0,'/',F3.0,' | Box_Size: ',F2.0,'° | Long: ',F5.1,
+     +'° | Lat: ',F5.1,'° | ',F1.0,' Enhanced: ',F2.0,' | Group: ',
+     +F3.0,' | Checksum: ',F3.0/
+     +11X,3X,'| & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
      +'Day',3X,'Light%',7X,'+x',7X,'+y'/
      +,' C         ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
      +,' R         ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
@@ -340,10 +335,10 @@ C
      +"/
 C
       DATA FORMAT(6)
-     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
-     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
-     +' * Checksum: ',F3.0/
-     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +/"(/,F5.0,'/',F3.0,' | Box_Size: ',F2.0,'° | Long: ',F5.1,
+     +'° | Lat: ',F5.1,'° | ',F1.0,' Enhanced: ',F2.0,' | Group: ',
+     +F3.0,' | Checksum: ',F3.0/
+     +11X,3X,'| & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
      +'Day',3X,'Light%',7X,'+x',7X,'+y'/
      +,' D=S-A     ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
      +,' E=(S-A)*W ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
@@ -352,10 +347,10 @@ C
      +"/
 C
       DATA FORMAT(7)
-     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
-     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
-     +' * Checksum: ',F3.0/
-     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +/"(/,F5.0,'/',F3.0,' | Box_Size: ',F2.0,'° | Long: ',F5.1,
+     +'° | Lat: ',F5.1,'° | ',F1.0,' Enhanced: ',F2.0,' | Group: ',
+     +F3.0,' | Checksum: ',F3.0/
+     +11X,3X,'| & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
      +'Day',3X,'Light%',7X,'+x',7X,'+y'/
      +,' I=U*A     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
      +,' J=V*A     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
@@ -364,10 +359,10 @@ C
      +"/
 C
       DATA FORMAT(8)
-     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
-     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
-     +' * Checksum: ',F3.0/
-     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +/"(/,F5.0,'/',F3.0,' | Box_Size: ',F2.0,'° | Long: ',F5.1,
+     +'° | Lat: ',F5.1,'° | ',F1.0,' Enhanced: ',F2.0,' | Group: ',
+     +F3.0,' | Checksum: ',F3.0/
+     +11X,3X,'| & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
      +'Day',3X,'Light%',7X,'+x',7X,'+y'/
      +,' S         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
      +,' A         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
@@ -376,10 +371,10 @@ C
      +"/
 C
       DATA FORMAT(9)
-     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
-     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
-     +' * Checksum: ',F3.0/
-     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +/"(/,F5.0,'/',F3.0,' | Box_Size: ',F2.0,'° | Long: ',F5.1,
+     +'° | Lat: ',F5.1,'° | ',F1.0,' Enhanced: ',F2.0,' | Group: ',
+     +F3.0,' | Checksum: ',F3.0/
+     +11X,3X,'| & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
      +'Day',3X,'Light%',7X,'+x',7X,'+y'/
      +,' M=(QS-Q)*U',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
      +,' N=(QS-Q)*V',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
