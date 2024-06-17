@@ -1,0 +1,480 @@
+#
+cat > p.f << ENDPROG
+C=============================================================================C
+C Comprehensive Ocean-Atmosphere Data Set (COADS):                   Software C
+C Program name.level: RDMSG.01D                              19 February 1997 C
+C Function: Read and print: Monthly Summary Groups (MSG.1)   Author: S.Lubker C
+C NOTE: For more software information, see <soft_info> (electronic document). C
+C=============================================================================C
+C bash | tee MSG2.[year].[month].[day].txt									  C
+C csh rdmsg1_Cshell MSG2.[year].[month].[day].STD							  C
+C echo "$1 `date`" | ./a.out												  C
+C exit																		  C
+C=============================================================================C
+      PROGRAM RDMSG
+C READ AND PRINT MSG.1
+      IMPLICIT INTEGER(A-E,G-Z)
+C
+      DATA UNIT/1/,FMISS/-9999./
+C
+      CHARACTER RPT*64
+C
+      CHARACTER FORMAT*640
+      PARAMETER(NUMBER=49)
+      COMMON /MSG1/FUNITS(NUMBER,3:9),FBASE(NUMBER,3:9),BITS(NUMBER)
+     +,OFFSET(NUMBER),FORMAT(3:9),RPTID,INDXCK
+C
+      DIMENSION CODED(NUMBER),FTRUE(NUMBER)
+     +,FTRUE2(4,10)
+      EQUIVALENCE(FTRUE(10),FTRUE2)
+      COMMON FTRUE
+C
+      CHARACTER LEVEL*4,PATH*128
+      DATA LEVEL/'.01D'/
+C
+      READ(*,'(A)')PATH
+      PRINT 1,LEVEL,PATH
+    1 FORMAT('1RDMSG',A4,' < ',A)
+C
+C OPEN TO READ BINARY DATA (MACHINE-DEPENDENT MODIFICATIONS MAY BE NEEDED)
+      OPEN(UNIT,FORM='UNFORMATTED',ACCESS='DIRECT',RECL=LEN(RPT))
+C     ,FILE=PATH)
+C INITIALIZE NUMBER OF RECORDS READ
+      NREC=0
+C
+C READ REPORT (MACHINE-DEPENDENT MODIFICATIONS MAY BE NEEDED)
+  100 READ(UNIT,REC=NREC+1,IOSTAT=EOF)RPT
+C EOF OF ZERO INDICATES A SUCCESSFUL READ
+      IF(EOF.NE.0)GOTO 900
+C INCREMENT NUMBER OF RECORDS READ
+      NREC=NREC+1
+C
+C UNPACK REPORT AND CONVERT CODED TO TRUE VALUES
+      GRP=ICHAR(RPT(8:8))/16
+      CALL GETRPT(RPT,CODED,FTRUE,FMISS
+     +,FUNITS(1,GRP),FBASE(1,GRP),BITS,OFFSET,NUMBER,RPTID,INDXCK)
+C PRINT REPORT
+      PRINT FORMAT(GRP),(FTRUE(I),I=1,INDXCK)
+     +,((FTRUE2(I,J),J=1,10),I=1,4)
+C
+C CALL ROUTINE FOR USER ACCESS TO TRUE VALUES (OPTIONAL)
+C      CALL USER(FMISS)
+C
+C STOP AFTER SEVERAL REPORTS HAVE BEEN READ
+C      IF(NREC.GE.20)STOP 'REMOVE STOP TO READ ALL REPORTS'
+      GOTO 100
+C
+C END OF FILE IF EOF IS NEGATIVE ELSE AN ERROR
+  900 PRINT *,'Reports: ',NREC,'* End Of File: ',EOF
+      END
+C-----------------------------------------------------------------------3456789
+      SUBROUTINE USER(FMISS)
+C USER ROUTINE FOR ACCESS TO TRUE VALUES
+      INTEGER S1,S3,S5,M,N,S,D,HT,X,Y
+      REAL YEAR,MONTH,BSZ,BLO,BLA,PID1,PID2,GRP,CK,FTRUE2
+C
+      PARAMETER(S1=1,S3=2,S5=3,M=4,N=5,S=6,D=7,HT=8,X=9,Y=10)
+      COMMON YEAR,MONTH,BSZ,BLO,BLA,PID1,PID2,GRP,CK,FTRUE2(4,Y)
+C
+C FOR EXAMPLE COMPUTE AND PRINT THE DIFFERENCE BETWEEN THE MEDIAN (S3) AND
+C             THE MEAN (M) FOR EACH OF THE 4 VARIABLES IN THIS GROUP.
+
+      PRINT *,(FTRUE2(I,S3)-FTRUE2(I,M),I=1,4)
+      END
+C=============================================================================C
+C WARNING:  Code beyond this point should not require any modification.       C
+C=============================================================================C
+C-----------------------------------------------------------------------3456789
+      BLOCK DATA BDMSG1
+      IMPLICIT INTEGER(A-E,G-Z)
+C
+      CHARACTER FORMAT*640
+      PARAMETER(NUMBER=49)
+      COMMON /MSG1/FUNITS(NUMBER,3:9),FBASE(NUMBER,3:9),BITS(NUMBER)
+     +,OFFSET(NUMBER),FORMAT(3:9),RPTID,INDXCK
+C
+      DATA (FUNITS(I,3),I=1,NUMBER)
+     +/1. ,1. ,1. ,.5 ,.5 ,1. ,1. ,1. ,1.
+     1 ,.01 ,.01 ,.01 ,.1
+     3 ,.01 ,.01 ,.01 ,.1
+     5 ,.01 ,.01 ,.01 ,.1
+     M ,.01 ,.01 ,.01 ,.1
+     N ,1. ,1. ,1. ,1.
+     S ,.01 ,.01 ,.01 ,.1
+     D ,2. ,2. ,2. ,2.
+     H ,.1 ,.1 ,.1 ,.1
+     X ,.1 ,.1 ,.1 ,.1
+     Y ,.1 ,.1 ,.1 ,.1/
+C
+      DATA (FUNITS(I,4),I=1,NUMBER)
+     +/1. ,1. ,1. ,.5 ,.5 ,1. ,1. ,1. ,1.
+     1 ,.01 ,.01 ,.01 ,.01
+     3 ,.01 ,.01 ,.01 ,.01
+     5 ,.01 ,.01 ,.01 ,.01
+     M ,.01 ,.01 ,.01 ,.01
+     N ,1. ,1. ,1. ,1.
+     S ,.01 ,.01 ,.01 ,.01
+     D ,2. ,2. ,2. ,2.
+     H ,.1 ,.1 ,.1 ,.1
+     X ,.1 ,.1 ,.1 ,.1
+     Y ,.1 ,.1 ,.1 ,.1/
+C
+      DATA (FUNITS(I,5),I=1,NUMBER)
+     +/1. ,1. ,1. ,.5 ,.5 ,1. ,1. ,1. ,1.
+     1 ,.1 ,.1 ,.1 ,.1
+     3 ,.1 ,.1 ,.1 ,.1
+     5 ,.1 ,.1 ,.1 ,.1
+     M ,.1 ,.1 ,.1 ,.1
+     N ,1. ,1. ,1. ,1.
+     S ,.1 ,.1 ,.1 ,.1
+     D ,2. ,2. ,2. ,2.
+     H ,.1 ,.1 ,.1 ,.1
+     X ,.1 ,.1 ,.1 ,.1
+     Y ,.1 ,.1 ,.1 ,.1/
+C
+      DATA (FUNITS(I,6),I=1,NUMBER)
+     +/1. ,1. ,1. ,.5 ,.5 ,1. ,1. ,1. ,1.
+     1 ,.01 ,.1 ,.01 ,.1
+     3 ,.01 ,.1 ,.01 ,.1
+     5 ,.01 ,.1 ,.01 ,.1
+     M ,.01 ,.1 ,.01 ,.1
+     N ,1. ,1. ,1. ,1.
+     S ,.01 ,.1 ,.01 ,.1
+     D ,2. ,2. ,2. ,2.
+     H ,.1 ,.1 ,.1 ,.1
+     X ,.1 ,.1 ,.1 ,.1
+     Y ,.1 ,.1 ,.1 ,.1/
+C
+      DATA (FUNITS(I,7),I=1,NUMBER)
+     +/1. ,1. ,1. ,.5 ,.5 ,1. ,1. ,1. ,1.
+     1 ,.1 ,.1 ,.1 ,.1
+     3 ,.1 ,.1 ,.1 ,.1
+     5 ,.1 ,.1 ,.1 ,.1
+     M ,.1 ,.1 ,.1 ,.1
+     N ,1. ,1. ,1. ,1.
+     S ,.1 ,.1 ,.1 ,.1
+     D ,2. ,2. ,2. ,2.
+     H ,.1 ,.1 ,.1 ,.1
+     X ,.1 ,.1 ,.1 ,.1
+     Y ,.1 ,.1 ,.1 ,.1/
+C
+      DATA (FUNITS(I,8),I=1,NUMBER)
+     +/1. ,1. ,1. ,.5 ,.5 ,1. ,1. ,1. ,1.
+     1 ,.01 ,.01 ,.1 ,.1
+     3 ,.01 ,.01 ,.1 ,.1
+     5 ,.01 ,.01 ,.1 ,.1
+     M ,.01 ,.01 ,.1 ,.1
+     N ,1. ,1. ,1. ,1.
+     S ,.01 ,.01 ,.1 ,.1
+     D ,2. ,2. ,2. ,2.
+     H ,.1 ,.1 ,.1 ,.1
+     X ,.1 ,.1 ,.1 ,.1
+     Y ,.1 ,.1 ,.1 ,.1/
+C
+      DATA (FUNITS(I,9),I=1,NUMBER)
+     +/1. ,1. ,1. ,.5 ,.5 ,1. ,1. ,1. ,1.
+     1 ,.1 ,.1 ,.5 ,5.
+     3 ,.1 ,.1 ,.5 ,5.
+     5 ,.1 ,.1 ,.5 ,5.
+     M ,.1 ,.1 ,.5 ,5.
+     N ,1. ,1. ,1. ,1.
+     S ,.1 ,.1 ,.5 ,5.
+     D ,2. ,2. ,2. ,2.
+     H ,.1 ,.1 ,.1 ,.1
+     X ,.1 ,.1 ,.1 ,.1
+     Y ,.1 ,.1 ,.1 ,.1/
+C
+      DATA (FBASE(I,3),I=1,NUMBER)
+     +/1799. ,0. ,-1. ,-1. ,-181. ,-1. ,-1. ,0. ,0.
+     1 ,-501. ,-8801. ,-1. ,-1.
+     3 ,-501. ,-8801. ,-1. ,-1.
+     5 ,-501. ,-8801. ,-1. ,-1.
+     M ,-501. ,-8801. ,-1. ,-1.
+     N ,0. ,0. ,0. ,0.
+     S ,-1. ,-1. ,-1. ,-1.
+     D ,0. ,0. ,0. ,0.
+     H ,-1. ,-1. ,-1. ,-1.
+     X ,-1. ,-1. ,-1. ,-1.
+     Y ,-1. ,-1. ,-1. ,-1./
+C
+      DATA (FBASE(I,4),I=1,NUMBER)
+     +/1799. ,0. ,-1. ,-1. ,-181. ,-1. ,-1. ,0. ,0.
+     1 ,-1. ,-10221. ,-10221. ,86999.
+     3 ,-1. ,-10221. ,-10221. ,86999.
+     5 ,-1. ,-10221. ,-10221. ,86999.
+     M ,-1. ,-10221. ,-10221. ,86999.
+     N ,0. ,0. ,0. ,0.
+     S ,-1. ,-1. ,-1. ,-1.
+     D ,0. ,0. ,0. ,0.
+     H ,-1. ,-1. ,-1. ,-1.
+     X ,-1. ,-1. ,-1. ,-1.
+     Y ,-1. ,-1. ,-1. ,-1./
+C
+      DATA (FBASE(I,5),I=1,NUMBER)
+     +/1799. ,0. ,-1. ,-1. ,-181. ,-1. ,-1. ,0. ,0.
+     1 ,-1. ,-1. ,-30001. ,-30001.
+     3 ,-1. ,-1. ,-30001. ,-30001.
+     5 ,-1. ,-1. ,-30001. ,-30001.
+     M ,-1. ,-1. ,-30001. ,-30001.
+     N ,0. ,0. ,0. ,0.
+     S ,-1. ,-1. ,-1. ,-1.
+     D ,0. ,0. ,0. ,0.
+     H ,-1. ,-1. ,-1. ,-1.
+     X ,-1. ,-1. ,-1. ,-1.
+     Y ,-1. ,-1. ,-1. ,-1./
+C
+      DATA (FBASE(I,6),I=1,NUMBER)
+     +/1799. ,0. ,-1. ,-1. ,-181. ,-1. ,-1. ,0. ,0.
+     1 ,-6301. ,-10001. ,-4001. ,-10001.
+     3 ,-6301. ,-10001. ,-4001. ,-10001.
+     5 ,-6301. ,-10001. ,-4001. ,-10001.
+     M ,-6301. ,-10001. ,-4001. ,-10001.
+     N ,0. ,0. ,0. ,0.
+     S ,-1. ,-1. ,-1. ,-1.
+     D ,0. ,0. ,0. ,0.
+     H ,-1. ,-1. ,-1. ,-1.
+     X ,-1. ,-1. ,-1. ,-1.
+     Y ,-1. ,-1. ,-1. ,-1./
+C
+      DATA (FBASE(I,7),I=1,NUMBER)
+     +/1799. ,0. ,-1. ,-1. ,-181. ,-1. ,-1. ,0. ,0.
+     1 ,-20001. ,-20001. ,-10001. ,-10001.
+     3 ,-20001. ,-20001. ,-10001. ,-10001.
+     5 ,-20001. ,-20001. ,-10001. ,-10001.
+     M ,-20001. ,-20001. ,-10001. ,-10001.
+     N ,0. ,0. ,0. ,0.
+     S ,-1. ,-1. ,-1. ,-1.
+     D ,0. ,0. ,0. ,0.
+     H ,-1. ,-1. ,-1. ,-1.
+     X ,-1. ,-1. ,-1. ,-1.
+     Y ,-1. ,-1. ,-1. ,-1./
+C
+      DATA (FBASE(I,8),I=1,NUMBER)
+     +/1799. ,0. ,-1. ,-1. ,-181. ,-1. ,-1. ,0. ,0.
+     1 ,-501. ,-8801. ,-30001. ,-30001.
+     3 ,-501. ,-8801. ,-30001. ,-30001.
+     5 ,-501. ,-8801. ,-30001. ,-30001.
+     M ,-501. ,-8801. ,-30001. ,-30001.
+     N ,0. ,0. ,0. ,0.
+     S ,-1. ,-1. ,-1. ,-1.
+     D ,0. ,0. ,0. ,0.
+     H ,-1. ,-1. ,-1. ,-1.
+     X ,-1. ,-1. ,-1. ,-1.
+     Y ,-1. ,-1. ,-1. ,-1./
+C
+      DATA (FBASE(I,9),I=1,NUMBER)
+     +/1799. ,0. ,-1. ,-1. ,-181. ,-1. ,-1. ,0. ,0.
+     1 ,-10001. ,-10001. ,-1. ,-1.
+     3 ,-10001. ,-10001. ,-1. ,-1.
+     5 ,-10001. ,-10001. ,-1. ,-1.
+     M ,-10001. ,-10001. ,-1. ,-1.
+     N ,0. ,0. ,0. ,0.
+     S ,-1. ,-1. ,-1. ,-1.
+     D ,0. ,0. ,0. ,0.
+     H ,-1. ,-1. ,-1. ,-1.
+     X ,-1. ,-1. ,-1. ,-1.
+     Y ,-1. ,-1. ,-1. ,-1./
+C
+      DATA BITS
+     +/8 ,4 ,3 ,10 ,9 ,3 ,3 ,4 ,4
+     1 ,16 ,16 ,16 ,16
+     3 ,16 ,16 ,16 ,16
+     5 ,16 ,16 ,16 ,16
+     M ,16 ,16 ,16 ,16
+     N ,16 ,16 ,16 ,16
+     S ,16 ,16 ,16 ,16
+     D ,4 ,4 ,4 ,4
+     H ,4 ,4 ,4 ,4
+     X ,4 ,4 ,4 ,4
+     Y ,4 ,4 ,4 ,4/
+C
+      DATA OFFSET
+     +/16 ,24 ,28 ,31 ,41 ,50 ,53 ,56 ,60
+     1 ,64 ,80 ,96 ,112
+     3 ,128 ,144 ,160 ,176
+     5 ,192 ,208 ,224 ,240
+     M ,256 ,272 ,288 ,304
+     N ,320 ,336 ,352 ,368
+     S ,384 ,400 ,416 ,432
+     D ,448 ,452 ,456 ,460
+     H ,464 ,468 ,472 ,476
+     X ,480 ,484 ,488 ,492
+     Y ,496 ,500 ,504 ,508/
+C
+      DATA FORMAT(3)
+C		   YEAR     MONTH    		BSZ			  BLO			   BLA
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+C			PID1 (unused)	PID2 (standard/enhanced stats)
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' S         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' A         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' Q         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' R         ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1)
+     +"/
+C
+      DATA FORMAT(4)
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' W         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' U         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' V         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' P         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1)
+     +"/
+C
+      DATA FORMAT(5)
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' C         ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' R         ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' X=W*U     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' Y=W*V     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1)
+     +"/
+C
+      DATA FORMAT(6)
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' D=S-A     ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' E=(S-A)*W ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' F=QS-Q    ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' G=(QS-Q)*W',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1)
+     +"/
+C
+      DATA FORMAT(7)
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' I=U*A     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' J=V*A     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' K=U*Q     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' L=V*Q     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1)
+     +"/
+C
+      DATA FORMAT(8)
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' S         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' A         ',F9.2,F9.2,F9.2,F9.2,F9.0,F9.2,F9.0,F9.1,F9.1,F9.1/
+     +,' X=W*U     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' Y=W*V     ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1)
+     +"/
+C
+      DATA FORMAT(9)
+     +/"(/,F5.0,'/',F3.0,' * Box_Size: ',F2.0,'° * Long: ',F5.1,
+     +'° * Lat: ',F5.1,'° ',F1.0,' Enhanced: ',F2.0,' * Group: ',F3.0,
+     +' * Checksum: ',F3.0/
+     +11X,3X,'* & ','S1',6X,'Med',7X,'S5',5X,'Mean',5X,'Obs.',8X,'σ',6X,
+     +'Day',3X,'Light%',7X,'+x',7X,'+y'/
+     +,' M=(QS-Q)*U',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' N=(QS-Q)*V',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' B1=W*W*W  ',F9.1,F9.1,F9.1,F9.1,F9.0,F9.1,F9.0,F9.1,F9.1,F9.1/
+     +,' B2=W*W*W  ',F9.0,F9.0,F9.0,F9.0,F9.0,F9.0,F9.0,F9.1,F9.1,F9.1)
+     +"/
+C
+      DATA RPTID/1/ ,INDXCK/9/
+      END
+C-----------------------------------------------------------------------3456789
+      SUBROUTINE GETRPT(RPT,CODED,FTRUE,FMISS
+     +,FUNITS,FBASE,BITS,OFFSET,NUMBER,RPTID,INDXCK)
+C     UNPACK REPORT AND CONVERT CODED TO TRUE VALUES
+C
+      IMPLICIT INTEGER(A-E,G-Z)
+      CHARACTER*(*) RPT
+      DIMENSION CODED(*),FTRUE(*),FUNITS(*),FBASE(*),BITS(*),OFFSET(*)
+C
+      IF(MOD(ICHAR(RPT(2:2)),16).NE.RPTID)STOP 'RPTID ERROR'
+      CALL UNPACK(RPT,CODED)
+      FTRUE(INDXCK)=CODED(INDXCK)
+      CODED(INDXCK)=0
+      DO 190 I=1,NUMBER
+        IF(I.EQ.INDXCK)GOTO 190
+        IF(CODED(I).EQ.0)THEN
+          FTRUE(I)=FMISS
+        ELSE
+          FTRUE(I)=(CODED(I)+FBASE(I))*FUNITS(I)
+          CODED(INDXCK)=CODED(INDXCK)+CODED(I)
+        ENDIF
+  190 CONTINUE
+      CODED(INDXCK)=MOD(CODED(INDXCK),2**BITS(INDXCK)-1)
+      IF(FTRUE(INDXCK).NE.CODED(INDXCK))STOP 'CHECKSUM ERROR'
+      END
+C-----------------------------------------------------------------------3456789
+      SUBROUTINE UNPACK(RPT,CODED)
+C     UNPACK REPORT
+C
+      IMPLICIT INTEGER(A-E,G-Z)
+      CHARACTER*(*) RPT
+      DIMENSION CODED(*)
+C
+      CODED(1)=ICHAR(RPT(3:3))
+      CODED(2)=ICHAR(RPT(4:4))/16
+      CODED(3)=MOD(ICHAR(RPT(4:4)),16)/2
+      CODED(4)=(MOD(ICHAR(RPT(4:4)),2)*256+ICHAR(RPT(5:5)))*2
+     ++ICHAR(RPT(6:6))/128
+      CODED(5)=MOD(ICHAR(RPT(6:6)),128)*4+ICHAR(RPT(7:7))/64
+      CODED(6)=MOD(ICHAR(RPT(7:7)),64)/8
+      CODED(7)=MOD(ICHAR(RPT(7:7)),8)
+      CODED(8)=ICHAR(RPT(8:8))/16
+      CODED(9)=MOD(ICHAR(RPT(8:8)),16)
+      CODED(10)=ICHAR(RPT(9:9))*256+ICHAR(RPT(10:10))
+      CODED(11)=ICHAR(RPT(11:11))*256+ICHAR(RPT(12:12))
+      CODED(12)=ICHAR(RPT(13:13))*256+ICHAR(RPT(14:14))
+      CODED(13)=ICHAR(RPT(15:15))*256+ICHAR(RPT(16:16))
+      CODED(14)=ICHAR(RPT(17:17))*256+ICHAR(RPT(18:18))
+      CODED(15)=ICHAR(RPT(19:19))*256+ICHAR(RPT(20:20))
+      CODED(16)=ICHAR(RPT(21:21))*256+ICHAR(RPT(22:22))
+      CODED(17)=ICHAR(RPT(23:23))*256+ICHAR(RPT(24:24))
+      CODED(18)=ICHAR(RPT(25:25))*256+ICHAR(RPT(26:26))
+      CODED(19)=ICHAR(RPT(27:27))*256+ICHAR(RPT(28:28))
+      CODED(20)=ICHAR(RPT(29:29))*256+ICHAR(RPT(30:30))
+      CODED(21)=ICHAR(RPT(31:31))*256+ICHAR(RPT(32:32))
+      CODED(22)=ICHAR(RPT(33:33))*256+ICHAR(RPT(34:34))
+      CODED(23)=ICHAR(RPT(35:35))*256+ICHAR(RPT(36:36))
+      CODED(24)=ICHAR(RPT(37:37))*256+ICHAR(RPT(38:38))
+      CODED(25)=ICHAR(RPT(39:39))*256+ICHAR(RPT(40:40))
+      CODED(26)=ICHAR(RPT(41:41))*256+ICHAR(RPT(42:42))
+      CODED(27)=ICHAR(RPT(43:43))*256+ICHAR(RPT(44:44))
+      CODED(28)=ICHAR(RPT(45:45))*256+ICHAR(RPT(46:46))
+      CODED(29)=ICHAR(RPT(47:47))*256+ICHAR(RPT(48:48))
+      CODED(30)=ICHAR(RPT(49:49))*256+ICHAR(RPT(50:50))
+      CODED(31)=ICHAR(RPT(51:51))*256+ICHAR(RPT(52:52))
+      CODED(32)=ICHAR(RPT(53:53))*256+ICHAR(RPT(54:54))
+      CODED(33)=ICHAR(RPT(55:55))*256+ICHAR(RPT(56:56))
+      CODED(34)=ICHAR(RPT(57:57))/16
+      CODED(35)=MOD(ICHAR(RPT(57:57)),16)
+      CODED(36)=ICHAR(RPT(58:58))/16
+      CODED(37)=MOD(ICHAR(RPT(58:58)),16)
+      CODED(38)=ICHAR(RPT(59:59))/16
+      CODED(39)=MOD(ICHAR(RPT(59:59)),16)
+      CODED(40)=ICHAR(RPT(60:60))/16
+      CODED(41)=MOD(ICHAR(RPT(60:60)),16)
+      CODED(42)=ICHAR(RPT(61:61))/16
+      CODED(43)=MOD(ICHAR(RPT(61:61)),16)
+      CODED(44)=ICHAR(RPT(62:62))/16
+      CODED(45)=MOD(ICHAR(RPT(62:62)),16)
+      CODED(46)=ICHAR(RPT(63:63))/16
+      CODED(47)=MOD(ICHAR(RPT(63:63)),16)
+      CODED(48)=ICHAR(RPT(64:64))/16
+      CODED(49)=MOD(ICHAR(RPT(64:64)),16)
+      END
+ENDPROG
+
+rm fort.1 ; ln -s $1 fort.1
+rm a.out ; f77 p.f
+echo "$1  `date`" | a.out
