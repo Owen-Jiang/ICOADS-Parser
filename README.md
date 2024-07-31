@@ -6,8 +6,8 @@ Note: this code was tested first on Linux, please make adjustments to your syste
 Note: the code is different for different kinds of datasets. Please use the releases page or the branch navigator to get to the right place. The main branch serves only as a landing page.
 
 ## Prerequisites
-+ FORTRAN 77
++ FORTRAN 77 (90 works for ds548.0)
 + Cshell
-+ Python
++ Python (ideally above 3.7)
   + pandas
   + csv
