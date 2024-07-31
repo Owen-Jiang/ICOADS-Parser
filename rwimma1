@@ -1,0 +1,1556 @@
+#
+cat > p.f90 << EOR
+!=============================================================================!
+! International Comprehensive Ocean-Atmosphere Data Set (ICOADS)  03 Jun 2020 !
+! Filename:level: rwimma1:01F                     Fortran 90/77 program+shell !
+! Purpose: Read and print/write IMMA                         Author: S.Lubker !
+! Usage: rwimma1 < InputIMMA1File [> OptionalOutputFileName]
+!=============================================================================!
+! Software Revision 01F Information (previous version: 03 Jun 2017, level 01E):
+! Updated to add entry PRNCSV to dump reports in CSV format, by replacing
+! PRNRPT with PRNCSV. 
+! Revision by Zaihua Ji on 03 Jun 2020
+!-----------------------------------------------------------------------3456789
+! Software Revision 01E Information (previous version: 16 Nov 2015, level 01D):
+! Updated to remove duplication of report print outs and counts.
+! Revision by Zaihua Ji on 03 Jun 2017
+!-----------------------------------------------------------------------3456789
+! Software documentation for the (modifiable) example program {rwimma} and for
+! the (invariant) user-interface routines {prnskp,prnhdr,getrpt,east,getpn,
+! geticn,getfn,getuid,minmax,savsum,putrpt,putsub,prnrpt,prnsum,init}.
+!
+! As provided {rwimma}: (a) Prints PROGID (the program name and level).  Also,
+! {prnhdr} prints a 5-line header for the unabbreviated record type (i.e., core
+! plus currently defined attms: 1,5-9 and 98-99).  (b) Reads a report (from
+! standard input) via a formatted read and calls {getrpt} to extract the fields
+! and convert them from characters to numeric values.  This makes the fields
+! available in three parallel arrays:
+!      CTRUE: characters (each length 2048)  blank       for missing data
+!      ITRUE: integers                       NINT(FMISS) for missing data
+!      FTRUE: true (floating point) values   FMISS       for missing data
+! Additional parallel arrays available within common block IMMA1 provide
+! metadata defining the properties of currently defined fields.  These include
+! each field's length (ILEN), abbreviation (ABBR), allowable range(s), units
+! (FUNITS; missing for character data) and type (ITYPE; 1=numeric, 2=base36,
+! 3=character) (see {bdimma} for details).  (c) For the core and attms, a
+! PARAMETER statement relates each field abbreviation to an FTRUE (CTRUE,
+! ITRUE, etc.) array location; this facilitates usage such as FTRUE(DY),
+! to obtain the floating point value for day.  Each element of CTRUE is a
+! 2048-character string, but the field length can be used to control printing,
+! e.g., PRINT *,CTRUE(DY)(:ILEN(DY)).  (d) Prints the original report, RPT,
+! under the aforementioned field headings (constructed using ABBR).  (e) The
+! program iterates (to step b) reading and printing reports until end-of-file
+! (EOF) is encountered.  Caution: IMPLICIT INTEGER(A-E,G-Z) is used, users may
+! need to explicitly type additional variables when modifying this program;
+! and deprecated attms 2-4 are recognized ({rwimma} will continue to read any
+! version of IMMA by temporarily reformatting in {getrpt} deprecated attms 2-4
+! into attms 5-7).
+!
+! The following optional features are initially deactivated in the Fortran
+! code; they may be activated by changing the appropriate Fortran comment
+! lines to executable statements, i.e., remove the "!" from column 1:
+!
+! (a) Activate one or more calls to {prnskp} to suppress printing of the core
+! and/or selected attms; {prnskp} is designed to work with the default calls
+! to {prnhdr} and {prnrpt} for a reduced-width printout.  Or (b): Deactivate
+! the default calls to {prnhdr} and {prnrpt}, and activate one (or more) of
+! the alternative calls to {prnhdr} and {prnrpt}.  This provides flexibility
+! so that the core or an attm can be printed individually (if only one pair
+! of {prnhdr,prnrpt} is activated; alternatively, this can be accomplished by
+! activating all but one call to {prnskp}).  Activating multiple alternative
+! calls to {prnhdr} and {prnrpt} can be used to arrange the core and attms
+! vertically (i.e., core and attms on multiple lines, for a single report).
+! Moreover, any contiguous portion of the headers and reports can be printed
+! by adjusting the fields that appear in the subroutine calls, e.g., activating
+! CALL PRNHDR(STDOUT,ILEN,ABBR,YR,HR) and CALL PRNRPT(STDOUT,ILEN,CTRUE,YR,HR)
+! prints just year, month, day, and hour.  Features (a) and (b) provide
+! flexibility to print selected portions of the data; however, note that those
+! two features were not designed to be used together (e.g., activating {prnskp}
+! to skip the core, and {prnhdr,prnrpt} to print the core, will produce blank
+! lines).  By default printing is to standard output (STDOUT=6), but optionally
+! STDOUT can be changed to another unit number in the calls to {prnhdr,prnrpt}.
+!
+! Additional notes on using {prnrpt}:  To minimize data volume, IMMA data may
+! have a "sparse" record structure, such that attms without any extant data are
+! omitted, and the attm structure can vary from report to report.  Sparse data
+! printed via the default calls to {prnhdr, prnrpt}, are expanded out into the
+! complete IMMA structure.  Or, using {prnskp}, sparse reports are expanded out
+! into a reduced print structure.  Alternatively, IMMA data may have a "fixed"
+! record structure, such that a fixed number of attms is always present.  In
+! either case, it can be determined whether an attm was originally present in
+! the input data from ATTI and ATTL: these are printed by {prnrpt} if the attm
+! was extant, or blank if it was missing.  ATTC will always reflect the number
+! of attms originally present (e.g., regardless how many are omitted from
+! printing through the use of {prnskp}).
+!
+! (c) Activating {east} will transform longitudes stored according to the
+! NCDC-variant (obsolescent) convention -179.99 (W) to 180.00 (E), into the
+! ICOADS convention 0-359.99 E. This action is applied only to the numeric data
+! (ITRUE, FTRUE), and does not take effect on the printed data, unless feature
+! (d) is also activated.  Modify examples to call functions which return
+! parameter number {getpn}, input component number {geticn}, and field number
+! {getfn}.  Activate {getuid} to get the next Unique report ID (see feature (h)
+! for details).
+!
+! (d) Activating {putrpt} will convert all the true values (e.g., longitudes
+! transformed via {east}) back into characters for printing and/or writing.
+! Specifically, if changes have been made to FTRUE, {putrpt} puts them also
+! into ITRUE, CTRUE, and RPT.  Then the changes can be printed, by leaving
+! {prnrpt} statement(s) in operation, or written, by activating (instead of
+! {prnrpt}) the adjacent WRITE statement.  If both {prnrpt} and the WRITE
+! statement are activated, each report will be output twice, possibly with
+! differences in format (which provides a means to see how the two different
+! output methods work).  For example, note that {prnskp} has no effect on the
+! WRITE statement, in contrast to its effect on {prnrpt}.  Reports with a
+! sparse record structure will be output when {putrpt} and the WRITE statement
+! are used, and ATTC will reflect the output attm count.  Reports with a fixed
+! record structure can be correctly output when {prnrpt} is used, with these
+! caveats: (1) ATTI and ATTL must be set, when the attm data are entirely
+! missing, or they will be printed blank; (2) ATTC will be set incorrectly if
+! {prnskp} is used, but any of the attm data are extant.
+!
+! (e) Activate calls: to {minmax}, to set any "extreme" true values to error
+! value FERR (by default equal to the missing value FMISS); to {savsum}, to
+! save summary information for each field; and to {prnsum}, to print the
+! following summary information on unit 10 (using field abbreviations, ABBR):
+!      -- A summary of the numbers (and percentages) of each field that are
+!         extant, missing, or erroneous.  Erroneous data are also counted
+!         as a subset of the missing category.  Any field (or attm) entirely
+!         missing in the input data is omitted from the summary.
+!      -- A summary of any erroneous fields encountered in the input data,
+!         with each unique pattern and its frequency listed.
+!
+! (f) The test for NREC greater than or equal to 50 can be activated to stop
+! before reading/printing the entire file.  Regarding feature (e), note that
+! the {prnsum} summary will only be output if statement 900 is reached.
+!
+! (g) With more extensive modifications, {rwimma} can be adapted to write
+! IMMA data, using non-IMMA data as input.  In this case it is important to
+! note that a maintenance issue will arise as updates are made to {rwimma}.
+! Therefore, we recommend that code added for this purpose be isolated (e.g.,
+! into separate routines) as much as possible.  To adapt {rwimma}, the READ
+! statement should be replaced by statements to read non-IMMA data, and
+! {getrpt} deactivated.  Prior to reading the non-IMMA data, {init} should
+! be called to properly initialize the data structures:
+!     CALL INIT(CTRUE,ITRUE,FTRUE,FMISS,ILEN,NUM)
+! Then the input data need to be transformed into the appropriate IMMA units,
+! loaded into FTRUE (for numeric fields) or into CTRUE (for character fields),
+! {putrpt} called, and the WRITE statement activated.  For writing character
+! fields into IMMA, {minmax} (see feature (e)), must also be called to signal
+! to the program when character data are present in CTRUE.  This also ensures
+! that any data (numeric or character) not compliant with the format are not
+! output (we also recommend that the other parts of feature (e), {savsum} and
+! {prnsum}, be called).  As discussed in Data Representation note (2) below,
+! base36 data (ITYPE=2) need to be stored in FTRUE as the corresponding numeric
+! value (e.g., 9=9.0, A=10.0).  Data of ITYPE=3 (character) must be stored
+! left-justified in CTRUE (see {bdimma} for field types and constraints).
+!
+! (h) Writing out new Unique IDs (UIDs): calls to {getuid} will return the UID
+! number found in file LAST_UID on unit 98, incremented by one. Also, {getuid}
+! then increments by one the UID number stored on unit 98. We emphasize that
+! the ICOADS project manages the master list of UID assignments, thus new UIDs
+! should not be assigned and written out without appropriate advance
+! consultation.
+!
+! (i) For subsidiary records containing multiple Rean-qc, Ivad, or Error attms,
+! two-dimensional structures similar to FTRUE/ITRUE/CTRUE exist:
+! FREAN/IREAN/CREAN, FIVAD/IIVAD/CIVAD, and FERROR/IERROR/CERROR.  After a read
+! or before a write NREAN, NIVAD, and NERROR are the number of those attms (a
+! maximum of 100 possible).  Activating {putsub} and the subsequent WRITE
+! statement writes a subsidiary record of any attm.  Subsidiary records begin
+! with the Uid attm and link other attms to the core.
+!
+! Data representation notes:
+! (1) Printed data:  In the header, the field abbreviations (from ABBR) are
+!     listed vertically.  The abbreviations are 1-5 characters in length, so
+!     the header always occupies five lines (even if a selected subset of
+!     fields includes no 5-character abbreviations).  All decimal points are
+!     omitted for printing (i.e., each FTRUE value is divided by its FUNITS;
+!     e.g., LON=33.80/0.01 = 3380 printed).  Missing data (FTRUE=FMISS) are
+!     printed as blank, as are erroneous data, unless the default for FERR is
+!     changed (see note 3).
+! (2) Stored data (FTRUE, ITRUE, and CTRUE):  Some 1-character fields and ATTL
+!     of attm8 (i.e., those with ITYPE=2) have alphabetic base36 values defined
+!     (and printed) as part of the legal range.  In ITRUE and FTRUE, these are
+!     stored as the corresponding numeric values: A=10, B=11, ..., Z=35.  For
+!     character (ITYPE=3) fields, note that ITRUE and FTRUE contain the ICHAR
+!     of the first character of the field (e.g., if ID=WHRN, ITRUE(ID)=87).
+!     This simplifies the implementation of the program, but users should be
+!     aware of the data type in processing character fields.
+! (3) Erroneous data:  Erroneous data can be detected in two ways: (i) Data
+!     that could not be read properly (e.g., a numeric field containing a
+!     special character).  (ii) "Extreme" data, which read properly, but failed
+!     to adhere to the ranges defined in {bdimma} (e.g., a numeric temperature
+!     outside of -99.9 to 99.9).  Data of the first type are always set to
+!     FERR, but data of the second type are only set to FERR if {minmax} is
+!     called.  FERR equals FMISS by default.  If FERR is set to a non-default
+!     value such as -888888., the printed output will contain all asterisks in
+!     fields that contained erroneous data.  The non-default setting is also
+!     used for quality control applications that need to distinguish between
+!     actual missing data and data that were extant but erroneous.
+!
+! Performance:  The long character strings made necessary by the supplemental
+! attm slow the program down.  Anyone not interested in those data could
+! replace:
+!      CHARACTER*2048 RPT,CTRUE
+! with
+!      CHARACTER*2048 RPT,CTRUE*16
+!
+! Machine/language dependencies:  None known.  Non-ANSI features: common block
+! containing both character and non-character variables, and specification
+! statements after data statements.
+! The program conforms to Fortran 90 source code conventions for comments and
+! continuation lines, but still compiles without change in many Fortran 77
+! environments.  Added/included source code can be either free form or fixed.
+! For more information: See
+! <http://icoads.noaa.gov/e-doc/imma/R2.5-imma_short.pdf> and
+! <http://icoads.noaa.gov/ivad/IMMA-Rev.pdf> (electronic documents).
+!-----------------------------------------------------------------------3456789
+      PROGRAM RWIMMA
+      IMPLICIT INTEGER(A-E,G-Z)
+      INTEGER FNC,FM,FBSRC,FNR,FNI,FNE
+!
+      CHARACTER*12 PROGID
+      DATA PROGID/'RWIMMA1.01F '/
+!
+! CORE
+      PARAMETER(YR=1,MO=2,DY=3,HR=4,LAT=5,LON=6,IM=7,ATTC=8,TI=9,LI=10        &
+     &,DS=11,VS=12,NID=13,II=14,ID=15,C1=16,DI=17,D=18,WI=19,W=20,VI=21       &
+     &,VV=22,WW=23,W1=24,SLP=25,A=26,PPP=27,IT=28,AT=29,WBTI=30,WBT=31        &
+     &,DPTI=32,DPT=33,SI=34,SST=35,N=36,NH=37,CL=38,HI=39,H=40,CM=41          &
+     &,CH=42,WD=43,WP=44,WH=45,SD=46,SP=47,SH=48)
+!
+! ICOADS ATTACHMENT
+      PARAMETER(ATTI1=49,ATTL1=50,BSI=51,B10=52,B1=53,DCK=54,SID=55           &
+     &,PT=56,DUPS=57,DUPC=58,TC=59,PB=60,WX=61,SX=62,C2=63,SQZ=64,SQA=65      &
+     &,AQZ=66,AQA=67,UQZ=68,UQA=69,VQZ=70,VQA=71,PQZ=72,PQA=73,DQZ=74         &
+     &,DQA=75,ND=76,SF=77,AF=78,UF=79,VF=80,PF=81,RF=82,ZNC=83,WNC=84         &
+     &,BNC=85,XNC=86,YNC=87,PNC=88,ANC=89,GNC=90,DNC=91,SNC=92,CNC=93         &
+     &,ENC=94,FNC=95,TNC=96,QCE=97,LZ=98,QCZ=99)
+!
+! IMMT-5/FM13 ATTACHMENT
+      PARAMETER(ATTI5=100,ATTL5=101,OS=102,OP=103,FM=104,IMMV=105,IX=106      &
+     &,W2=107,WMI=108,SD2=109,SP2=110,SH2=111,IS=112,ES=113,RS=114            &
+     &,IC1=115,IC2=116,IC3=117,IC4=118,IC5=119,IR=120,RRR=121,TR=122          &
+     &,NU=123,QCI=124,QI1=125,QI2=126,QI3=127,QI4=128,QI5=129,QI6=130         &
+     &,QI7=131,QI8=132,QI9=133,QI10=134,QI11=135,QI12=136,QI13=137            &
+     &,QI14=138,QI15=139,QI16=140,QI17=141,QI18=142,QI19=143,QI20=144         &
+     &,QI21=145,HDG=146,COG=147,SOG=148,SLL=149,SLHH=150,RWD=151,RWS=152      &
+     &,QI22=153,QI23=154,QI24=155,QI25=156,QI26=157,QI27=158,QI28=159         &
+     &,QI29=160,RH=161,RHI=162,AWSI=163,IMONO=164)
+!
+! MODEL QUALITY CONTROL ATTACHMENT
+      PARAMETER(ATTI6=165,ATTL6=166,CCCC=167,BUID=168,FBSRC=169,BMP=170       &
+     &,BSWU=171,SWU=172,BSWV=173,SWV=174,BSAT=175,BSRH=176,SRH=177            &
+     &,BSST=178,MST=179,MSH=180,BY=181,BM=182,BD=183,BH=184,BFL=185)
+!
+! SHIP METADATA ATTACHMENT
+      PARAMETER(ATTI7=186,ATTL7=187,MDS=188,C1M=189,OPM=190,KOV=191           &
+     &,COR=192,TOB=193,TOT=194,EOT=195,LOT=196,TOH=197,EOH=198,SIM=199        &
+     &,LOV=200,DOS=201,HOP=202,HOT=203,HOB=204,HOA=205,SMF=206,SME=207        &
+     &,SMV=208)
+!
+! NEAR-SURFACE OCEANOGRAPHIC DATA ATTACHMENT
+      PARAMETER(ATTI8=209,ATTL8=210,OTV=211,OTZ=212,OSV=213,OSZ=214           &
+     &,OOV=215,OOZ=216,OPV=217,OPZ=218,OSIV=219,OSIZ=220,ONV=221,ONZ=222      &
+     &,OPHV=223,OPHZ=224,OCV=225,OCZ=226,OAV=227,OAZ=228,OPCV=229             &
+     &,OPCZ=230,ODV=231,ODZ=232,PUID=233)
+!
+! EDITED CLOUD REPORT ATTACHMENT
+      PARAMETER(ATTI9=234,ATTL9=235,CCE=236,WWE=237,NE=238,NHE=239            &
+     &,HE=240,CLE=241,CME=242,CHE=243,AM=244,AH=245,UM=246,UH=247             &
+     &,SBI=248,SA=249,RI=250)
+!
+! REANALYSES QC/FEEDBACK ATTACHMENT
+      PARAMETER(ATTI95=251,ATTL95=252,ICNR=253,FNR=254,DPRO=255,DPRP=256      &
+     &,UFR=257,MFGR=258,MFGSR=259,MAR=260,MASR=261,BCR=262,ARCR=263           &
+     &,CDR=264,ASIR=265)
+!
+! ICOADS VALUE-ADDED DATABASE ATTACHMENT
+      PARAMETER(ATTI96=266,ATTL96=267,ICNI=268,FNI=269,JVAD=270,VAD=271       &
+     &,IVAU1=272,JVAU1=273,VAU1=274,IVAU2=275,JVAU2=276,VAU2=277              &
+     &,IVAU3=278,JVAU3=279,VAU3=280,VQC=281,ARCI=282,CDI=283,ASII=284)
+!
+! ERROR ATTACHMENT
+      PARAMETER(ATTI97=285,ATTL97=286,ICNE=287,FNE=288,CEF=289,ERRD=290       &
+     &,ARCE=291,CDE=292,ASIE=293)
+!
+! UNIQUE ID ATTACHMENT
+      PARAMETER(ATTI98=294,ATTL98=295,UID=296,RN1=297,RN2=298,RN3=299         &
+     &,RSA=300,IRF=301)
+!
+! SUPPLEMENTAL DATA ATTACHMENT
+      PARAMETER(ATTI99=302,ATTL99=303,ATTE=304,SUPD=305)
+!
+! ATTACHMENT REPORT ID
+      PARAMETER(COREID=0,REANID=9561,IVADID=9653,ERRORID=9732)
+!
+      PARAMETER(NUM=305)
+      CHARACTER*8 ABBR,RPTID
+      COMMON /IMMA1/ILEN(NUM),ABBR(NUM),FMIN1(NUM),FMAX1(NUM)                 &
+     &,FMIN2(NUM),FMAX2(NUM),FUNITS(NUM),ITYPE(NUM),RPTID
+!
+      CHARACTER*2048 RPT,CTRUE
+      DIMENSION CTRUE(NUM),ITRUE(NUM),FTRUE(NUM)
+      DATA CTRUE/NUM*' '/,ITRUE/NUM*-9999999/,FTRUE/NUM*-9999999./            &
+     &,FMISS/-9999999./,FERR/-9999999./,UNIT/10/,STDOUT/6/
+!
+      CHARACTER*16 CREAN,CIVAD,CERROR
+      COMMON /REAN/CREAN(ATTI95:ASIR,100),IREAN(ATTI95:ASIR,100)              &
+     &,FREAN(ATTI95:ASIR,100),NREAN
+      COMMON /IVAD/CIVAD(ATTI96:ASII,100),IIVAD(ATTI96:ASII,100)              &
+     &,FIVAD(ATTI96:ASII,100),NIVAD
+      COMMON /ERROR/CERROR(ATTI97:ASIE,100),IERROR(ATTI97:ASIE,100)           &
+     &,FERROR(ATTI97:ASIE,100),NERROR
+!
+! PRINT PROGRAM HEADER
+      WRITE(STDOUT,*)PROGID
+! DO NOT PRINT CORE HEADER OR CORE
+!      CALL PRNSKP(YR,SH)
+! DO NOT PRINT ATTACHMENT HEADER OR ATTACHMENT
+!      CALL PRNSKP(ATTI1,ATTI5-1)
+!      CALL PRNSKP(ATTI5,ATTI6-1)
+!      CALL PRNSKP(ATTI6,ATTI7-1)
+!      CALL PRNSKP(ATTI7,ATTI8-1)
+!      CALL PRNSKP(ATTI8,ATTI9-1)
+!      CALL PRNSKP(ATTI9,ATTI95-1)
+!      CALL PRNSKP(ATTI95,ATTI96-1)
+      CALL PRNSKP(ATTI96,ATTI97-1)
+      CALL PRNSKP(ATTI97,ATTI98-1)
+!      CALL PRNSKP(ATTI98,ATTI99-1)
+!      CALL PRNSKP(ATTI99,SUPD)
+!
+! PRINT REPORT HEADER
+      CALL PRNHDR(STDOUT,ILEN,ABBR,YR,SUPD)
+! PRINT CORE HEADER
+!      CALL PRNHDR(STDOUT,ILEN,ABBR,YR,SH)
+! PRINT ATTACHMENT HEADER
+!      CALL PRNHDR(STDOUT,ILEN,ABBR,ATTI1,ATTI5-1)
+!      CALL PRNHDR(STDOUT,ILEN,ABBR,ATTI5,ATTI6-1)
+!      CALL PRNHDR(STDOUT,ILEN,ABBR,ATTI6,ATTI7-1)
+!      CALL PRNHDR(STDOUT,ILEN,ABBR,ATTI7,ATTI8-1)
+!      CALL PRNHDR(STDOUT,ILEN,ABBR,ATTI8,ATTI9-1)
+!      CALL PRNHDR(STDOUT,ILEN,ABBR,ATTI9,ATTI95-1)
+!      CALL PRNHDR(STDOUT,ILEN,ABBR,ATTI95,ATTI96-1)
+!      CALL PRNHDR(STDOUT,ILEN,ABBR,ATTI96,ATTI97-1)
+!      CALL PRNHDR(STDOUT,ILEN,ABBR,ATTI97,ATTI98-1)
+!      CALL PRNHDR(STDOUT,ILEN,ABBR,ATTI98,ATTI99-1)
+!      CALL PRNHDR(STDOUT,ILEN,ABBR,ATTI99,SUPD)
+! INITIALIZE NUMBER OF REPORTS READ
+      NREC=0
+!
+! READ REPORT
+  100 CONTINUE
+      READ(*,'(A)',END=900)RPT
+!
+! CONVERT CHARACTERS TO FLOATING POINT VALUES
+      CALL GETRPT(RPT,CTRUE,ITRUE,FTRUE,FMISS,FERR                            &
+     &,ILEN,ABBR,FMIN1,FUNITS,ITYPE,RPTID,NUM, ATTID)
+!
+! INCREMENT NUMBER OF REPORTS READ FOR CORE RECORD ONLY
+      IF(ATTID .EQ. COREID) NREC=NREC+1
+!
+! CONVERT LONGITUDE TO DEGREES EAST
+!      CALL EAST(ITRUE(LON),FTRUE(LON),FERR)
+! EXAMPLE OF PARAMETER/INPUT COMPONENT/FIELD NUMBER FUNCTIONS
+!      IF (GETPN(GETICN(SST),GETFN(SST)).NE.SST) STOP 'INITICN'
+! GET UNIQUE REPORT ID
+!      CALL GETUID(CTRUE(UID))
+! SET EXTREME FLOATING POINT VALUES TO ERROR VALUE
+!      CALL MINMAX(CTRUE,ITRUE,FTRUE,FMISS,FERR                                &
+!     &,ILEN,FMIN1,FMAX1,FMIN2,FMAX2,FUNITS,ITYPE,NUM)
+! SAVE SUMMARY INFORMATION
+!      CALL SAVSUM(CTRUE,FTRUE,FMISS,FERR                                      &
+!     &,ILEN,ABBR,NUM)
+!
+! CONVERT FLOATING POINT VALUES TO CHARACTERS
+!      CALL PUTRPT(RPT,CTRUE,ITRUE,FTRUE,FMISS,FERR                            &
+!     &,ILEN,ABBR,FMIN1,FUNITS,ITYPE,RPTID,NUM)
+! WRITE REPORT
+!      WRITE(STDOUT,'(A)')TRIM(RPT)
+!
+! CONVERT SUBSIDIARY FLOATING POINT VALUES TO CHARACTERS
+!      CALL PUTSUB(RPT,CTRUE,ITRUE,FTRUE,FMISS,FERR                            &
+!     &,ILEN,ABBR,FMIN1,FUNITS,ITYPE,RPTID,NUM,ATTI7,ATTI8-1)
+!     &,ILEN,ABBR,FMIN1,FUNITS,ITYPE,RPTID,NUM,ATTI9,ATTI95-1)
+!     &,ILEN,ABBR,FMIN1,FUNITS,ITYPE,RPTID,NUM,ATTI95,ATTI96-1)
+!     &,ILEN,ABBR,FMIN1,FUNITS,ITYPE,RPTID,NUM,ATTI96,ATTI97-1)
+!     &,ILEN,ABBR,FMIN1,FUNITS,ITYPE,RPTID,NUM,ATTI97,ATTI98-1)
+! WRITE SUBSIDIARY REPORT
+!      IF (RPT.NE.' ') WRITE(STDOUT,'(A)')TRIM(RPT)
+!
+! PRINT REPORT
+      IF(ATTID .EQ. COREID) THEN
+        CALL PRNRPT(STDOUT,ILEN,CTRUE,YR,SUPD)
+!        CALL PRNCSV(STDOUT,ILEN,CTRUE,YR,SUPD)
+! PRINT CORE
+!        CALL PRNRPT(STDOUT,ILEN,CTRUE,YR,SH)
+! PRINT ATTACHMENT
+!        CALL PRNRPT(STDOUT,ILEN,CTRUE,ATTI1,ATTI5-1)
+!        CALL PRNRPT(STDOUT,ILEN,CTRUE,ATTI5,ATTI6-1)
+!        CALL PRNRPT(STDOUT,ILEN,CTRUE,ATTI6,ATTI7-1)
+!        CALL PRNRPT(STDOUT,ILEN,CTRUE,ATTI7,ATTI8-1)
+!        CALL PRNRPT(STDOUT,ILEN,CTRUE,ATTI8,ATTI9-1)
+!        CALL PRNRPT(STDOUT,ILEN,CTRUE,ATTI9,ATTI95-1)
+!        CALL PRNRPT(STDOUT,ILEN,CTRUE,ATTI98,ATTI99-1)
+!        CALL PRNRPT(STDOUT,ILEN,CTRUE,ATTI99,SUPD)
+      ENDIF
+!      IF(ATTID .EQ. REANID) THEN
+!        DO J=1,NREAN
+!          CALL PRNRPT(STDOUT,ILEN(ATTI95),CREAN(:,J),1,ATTI96-ATTI95)
+!        ENDDO
+!      ENDIF
+!      IF(ATTID .EQ. IVADID) THEN
+!        DO J=1,NIVAD
+!          IF (GETPN(IIVAD(ICNI,J),IIVAD(FNI,J)).EQ.SST) CONTINUE
+!          CALL PRNRPT(STDOUT,ILEN(ATTI96),CIVAD(:,J),1,ATTI97-ATTI96)
+!        ENDDO
+!      ENDIF
+!      IF(ATTID .EQ. ERRORID) THEN
+!        DO J=1,NERROR
+!          CALL PRNRPT(STDOUT,ILEN(ATTI97),CERROR(:,J),1,ATTI98-ATTI97)
+!        ENDDO
+!      ENDIF
+!
+! STOP AFTER SEVERAL REPORTS HAVE BEEN READ
+!      IF (NREC.GE.50) STOP 'REMOVE STOP TO READ ALL REPORTS'
+      GOTO 100
+!
+! END OF FILE
+  900 CONTINUE
+      WRITE(STDOUT,*)'REPORTS ',NREC
+!
+! PRINT SUMMARY INFORMATION TO UNIT
+!      CALL PRNSUM(UNIT,PROGID,ABBR,NUM)
+      END
+!=============================================================================!
+! WARNING:  Code beyond this point should not require any modification.       !
+!=============================================================================!
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE INIT(CTRUE,ITRUE,FTRUE,FMISS,ILEN,NUM)
+! INITIALIZE CTRUE, ITRUE, FTRUE, NIVAD, AND NERROR
+      IMPLICIT INTEGER(A-E,G-Z)
+      CHARACTER*(*) CTRUE
+      DIMENSION CTRUE(NUM),ITRUE(NUM),FTRUE(NUM),ILEN(NUM)
+      CHARACTER*16 CREAN,CIVAD,CERROR
+      COMMON /REAN/CREAN(15,100),IREAN(15,100),FREAN(15,100),NREAN
+      COMMON /IVAD/CIVAD(19,100),IIVAD(19,100),FIVAD(19,100),NIVAD
+      COMMON /ERROR/CERROR(9,100),IERROR(9,100),FERROR(9,100),NERROR
+!
+      DO 190 I=1,NUM
+        IF (ILEN(I).EQ.1024) THEN
+          CTRUE(I)(:)=' '
+        ELSE
+          IF (ILEN(I).GT.LEN(CTRUE(I))) STOP 'INIT LEN CTRUE'
+          CTRUE(I)(:ILEN(I))=' '
+        ENDIF
+  190 CONTINUE
+      ITRUE=NINT(FMISS)
+      FTRUE=FMISS
+!      CREAN=' '
+!      IREAN=NINT(FMISS)
+!      FREAN=FMISS
+      NREAN=0
+!      CIVAD=' '
+!      IIVAD=NINT(FMISS)
+!      FIVAD=FMISS
+      NIVAD=0
+!      CERROR=' '
+!      IERROR=NINT(FMISS)
+!      FERROR=FMISS
+      NERROR=0
+      END
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE PRNSKP(BEG,END)
+! DO NOT PRINT REPORT HEADER OR REPORT
+      IMPLICIT INTEGER(A-E,G-Z)
+      CHARACTER*(*) ABBR,CTRUE
+      DIMENSION ILEN(*),ABBR(*),CTRUE(*)
+      CHARACTER*2048 HDR,RPT
+      EQUIVALENCE(HDR,RPT)
+      DIMENSION SKP(1024)
+      DATA SKP/1024*0/
+      SAVE SKP
+!
+      DO 190 I=BEG,END
+        SKP(I)=1
+  190 CONTINUE
+      RETURN
+!-----------------------------------------------------------------------3456789
+      ENTRY PRNHDR(STDOUT,ILEN,ABBR,BEG,END)
+! PRINT REPORT HEADER
+!
+      DO 290 J=1,5
+        HDR=' '
+        PTR=0
+        DO 280 I=BEG,END
+          IF (SKP(I).NE.1) THEN
+            IF (ILEN(I).EQ.1024) THEN
+              PTR=PTR+1
+            ELSE
+              PTR=PTR+ILEN(I)
+            ENDIF
+            IF (PTR.GT.LEN(HDR)) STOP 'PRNHDR LEN HDR'
+            HDR(PTR:PTR)=ABBR(I)(J:J)
+          ENDIF
+  280   CONTINUE
+        WRITE(STDOUT,'(A)')HDR(:PTR)
+  290 CONTINUE
+      RETURN
+!-----------------------------------------------------------------------3456789
+      ENTRY PRNRPT(STDOUT,ILEN,CTRUE,BEG,END)
+! PRINT REPORT
+!
+      RPT=' '
+      PTR=0
+      DO 390 I=BEG,END
+        IF (SKP(I).NE.1) THEN
+          IF (ILEN(I).EQ.1024) THEN
+            IF (CTRUE(I)(:).EQ.' ') THEN
+              WRITE(STDOUT,'(2A)')RPT(:PTR),' '
+            ELSE
+              WRITE(STDOUT,'(2A)')RPT(:PTR),TRIM(CTRUE(I))
+            ENDIF
+            RETURN
+          ENDIF
+          IF (ILEN(I).GT.LEN(CTRUE(I))) STOP 'PRNRPT LEN CTRUE'
+          IF (PTR+ILEN(I).GT.LEN(RPT)) STOP 'PRNRPT LEN RPT'
+          RPT(PTR+1:PTR+ILEN(I))=CTRUE(I)(:ILEN(I))
+          PTR=PTR+ILEN(I)
+        ENDIF
+  390 CONTINUE
+      WRITE(STDOUT,'(A)')RPT(:PTR)
+      RETURN
+!-----------------------------------------------------------------------3456789
+      ENTRY PRNCSV(STDOUT,ILEN,CTRUE,BEG,END)
+! PRINT REPORT IN CSV FORMAT
+!
+      RPT=' '
+      PTR=0
+      DO 490 I=BEG,END
+        IF (SKP(I).NE.1) THEN
+          IF (ILEN(I).EQ.1024) THEN
+            IF (CTRUE(I)(:).EQ.' ') THEN
+              WRITE(STDOUT,'(2A)')RPT(:PTR),','
+            ELSE
+              WRITE(STDOUT,'(3A)')RPT(:PTR),',',TRIM(CTRUE(I))
+            ENDIF
+            RETURN
+          ENDIF
+          IF (ILEN(I).GT.LEN(CTRUE(I))) STOP 'PRNCSV LEN CTRUE'
+          POS1=1
+          POS2=ILEN(I)
+          DO WHILE (POS1.LE.POS2.AND.CTRUE(I)(POS1:POS1).EQ.' ')
+             POS1=POS1+1
+          ENDDO
+          DO WHILE (POS2.GT.POS1.AND.CTRUE(I)(POS2:POS2).EQ.' ')
+             POS2=POS2-1
+          ENDDO
+          SLEN=POS2-POS1+1
+          IF (I.GT.BEG) THEN
+             PTR=PTR+1
+             IF (PTR+SLEN.GT.LEN(RPT)) STOP 'PRNCSV LEN RPT'
+             RPT(PTR:PTR)=','
+          ENDIF
+          IF (SLEN.GT.0) THEN
+             RPT(PTR+1:PTR+SLEN)=CTRUE(I)(POS1:POS2)
+             PTR=PTR+SLEN
+          ENDIF
+        ENDIF
+  490 CONTINUE
+      WRITE(STDOUT,'(A)')RPT(:PTR)
+      END
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE GETRPT(RPT,CTRUE,ITRUE,FTRUE,FMISS,FERR                      &
+     &,ILEN,ABBR,FMIN1,FUNITS,ITYPE,RPTID,NUM, ATTID)
+! CONVERT CHARACTERS TO FLOATING POINT VALUES
+      IMPLICIT INTEGER(A-E,G-Z)
+      CHARACTER*(*) RPT,CTRUE,ABBR,RPTID
+      DIMENSION CTRUE(NUM),ITRUE(NUM),FTRUE(NUM)                              &
+     &,ILEN(NUM),ABBR(NUM),FMIN1(NUM),FUNITS(NUM),ITYPE(NUM)
+      CHARACTER B36*10,IFMT(10)*8,STR*2048
+      DATA IFMT/'(BZ,I1)','(BZ,I2)','(BZ,I3)','(BZ,I4)','(BZ,I5)'             &
+     &,'(BZ,I6)','(BZ,I7)','(BZ,I8)','(BZ,I9)','(BZ,I10)'/
+      SAVE IFMT
+      CHARACTER UID*10
+      DATA UID/'9815------'/
+      SAVE UID
+      CHARACTER*16 CREAN,CIVAD,CERROR
+      COMMON /REAN/CREAN(15,100),IREAN(15,100),FREAN(15,100),NREAN
+      COMMON /IVAD/CIVAD(19,100),IIVAD(19,100),FIVAD(19,100),NIVAD
+      COMMON /ERROR/CERROR(9,100),IERROR(9,100),FERROR(9,100),NERROR
+      PARAMETER(ATTI1=49)
+      PARAMETER(ATTI5=100)
+      PARAMETER(ATTI6=165)
+      PARAMETER(ATTI7=186)
+      PARAMETER(ATTI8=209)
+      PARAMETER(ATTI9=234)
+      PARAMETER(ATTI95=251)
+      PARAMETER(ATTI96=266)
+      PARAMETER(ATTI97=285)
+      PARAMETER(ATTI98=294)
+      PARAMETER(ATTI99=302)
+! ATTACHMENT REPORT ID
+      PARAMETER(COREID=0,REANID=9561,IVADID=9653,ERRORID=9732)
+!
+      IF (INITICN(ABBR,FMIN1,NUM).NE.ATTI99) STOP 'GETRPT INITICN'
+      IF (RPT(:10).NE.UID) CALL INIT(CTRUE,ITRUE,FTRUE,FMISS,ILEN,NUM)
+      PTR=0
+      IF (RPT(:4).NE.'9815') CALL GETATT(RPT,PTR,1,48)
+      ATTC=0
+      ATTID=COREID
+      DO WHILE (PTR.LT.LEN(RPT) .AND. RPT(PTR+1:).NE.' ')
+        SELECT CASE(RPT(PTR+1:PTR+4))
+          CASE(' 165')
+            CALL GETATT(RPT,PTR,ATTI1,ATTI1-1+51)
+          CASE(' 594')
+            CALL GETATT(RPT,PTR,ATTI5,ATTI5-1+65)
+          CASE(' 668')
+            CALL GETATT(RPT,PTR,ATTI6,ATTI6-1+21)
+          CASE(' 758')
+            CALL GETATT(RPT,PTR,ATTI7,ATTI7-1+23)
+          CASE(' 82U')
+            CALL GETATT(RPT,PTR,ATTI8,ATTI8-1+25)
+          CASE(' 932')
+            CALL GETATT(RPT,PTR,ATTI9,ATTI9-1+17)
+          CASE('9561')
+            ATTID=REANID
+            CALL GETATT(RPT,PTR,ATTI95,ATTI95-1+4)
+            PN=GETPN(NINT(FTRUE(ATTI95-1+3)),NINT(FTRUE(ATTI95-1+4)))
+            CALL SETINHR(PN)
+            CALL GETATT(RPT,PTR,ATTI95-1+5,ATTI95-1+15)
+            NREAN=NREAN+1
+            IF (NREAN.GT.100) STOP 'GETRPT NREAN'
+            FREAN(:,NREAN)=FTRUE(ATTI95:ATTI95-1+15)
+            IREAN(:,NREAN)=ITRUE(ATTI95:ATTI95-1+15)
+            CREAN(:,NREAN)=CTRUE(ATTI95:ATTI95-1+15)
+          CASE('9653')
+            ATTID=IVADID
+            CALL GETATT(RPT,PTR,ATTI96,ATTI96-1+4)
+            PN=GETPN(NINT(FTRUE(ATTI96-1+3)),NINT(FTRUE(ATTI96-1+4)))
+            TRS=PTR
+            CALL GETATT(RPT,TRS,ATTI96-1+5,ATTI96-1+14)
+            CALL SETINHI(PN)
+            CALL GETATT(RPT,PTR,ATTI96-1+5,ATTI96-1+19)
+            NIVAD=NIVAD+1
+            IF (NIVAD.GT.100) STOP 'GETRPT NIVAD'
+            FIVAD(:,NIVAD)=FTRUE(ATTI96:ATTI96-1+19)
+            IIVAD(:,NIVAD)=ITRUE(ATTI96:ATTI96-1+19)
+            CIVAD(:,NIVAD)=CTRUE(ATTI96:ATTI96-1+19)
+          CASE('9732')
+            ATTID=ERRORID 
+            CALL GETATT(RPT,PTR,ATTI97,ATTI97-1+4)
+            PN=GETPN(NINT(FTRUE(ATTI97-1+3)),NINT(FTRUE(ATTI97-1+4)))
+            CALL SETINHE(PN)
+            CALL GETATT(RPT,PTR,ATTI97-1+5,ATTI97-1+9)
+            NERROR=NERROR+1
+            IF (NERROR.GT.100) STOP 'GETRPT NERROR'
+            FERROR(:,NERROR)=FTRUE(ATTI97:ATTI97-1+9)
+            IERROR(:,NERROR)=ITRUE(ATTI97:ATTI97-1+9)
+            CERROR(:,NERROR)=CTRUE(ATTI97:ATTI97-1+9)
+          CASE('9815')
+            UID=RPT(PTR+1:)
+            CALL GETATT(RPT,PTR,ATTI98,ATTI98-1+8)
+          CASE('99 0')
+            CALL GETATT(RPT,PTR,ATTI99,ATTI99-1+4)
+            EXIT
+          CASE(' 276')
+            TRS=0
+            IF (PTR+76.GT.LEN(RPT)) STOP 'GETRPT LEN RPT'
+            STR=' 594'//RPT(PTR+5:PTR+6)//RPT(PTR+8:PTR+8)//' '               &
+     &      //RPT(PTR+9:PTR+10)//RPT(PTR+15:PTR+35)//' '                      &
+     &      //RPT(PTR+36:PTR+76)//'                     '
+            CALL GETATT(STR,TRS,ATTI5,ATTI5-1+65)
+            PTR=PTR+76
+          CASE(' 366')
+            TRS=0
+            IF (PTR+66.GT.LEN(RPT)) STOP 'GETRPT LEN RPT'
+            STR=' 668'//RPT(PTR+5:PTR+14)//' '//RPT(PTR+15:PTR+45)            &
+     &      //RPT(PTR+47:PTR+50)//' '//RPT(PTR+51:PTR+51)//' '                &
+     &      //RPT(PTR+52:PTR+66)
+            CALL GETATT(STR,TRS,ATTI6,ATTI6-1+21)
+            PTR=PTR+66
+          CASE(' 457')
+            TRS=0
+            IF (PTR+57.GT.LEN(RPT)) STOP 'GETRPT LEN RPT'
+            STR=' 758'//' '//RPT(PTR+5:PTR+57)
+            CALL GETATT(STR,TRS,ATTI7,ATTI7-1+23)
+            PTR=PTR+57
+          CASE DEFAULT
+            STOP 'GETRPT ATTI ATTL'
+        END SELECT
+      ENDDO
+      RETURN
+!-----------------------------------------------------------------------3456789
+      ENTRY PUTRPT(RPT,CTRUE,ITRUE,FTRUE,FMISS,FERR                           &
+     &,ILEN,ABBR,FMIN1,FUNITS,ITYPE,RPTID,NUM)
+! CONVERT FLOATING POINT VALUES TO CHARACTERS
+!
+      IF (INITICN(ABBR,FMIN1,NUM).NE.ATTI99) STOP 'PUTRPT INITICN'
+      RPT=' '
+      PTR=0
+      CALL PUTATT(RPT,PTR,1,48)
+      ATTC=0
+      CALL PUTATT(RPT,PTR,ATTI1,ATTI1-1+51)
+      CALL PUTATT(RPT,PTR,ATTI5,ATTI5-1+65)
+      CALL PUTATT(RPT,PTR,ATTI6,ATTI6-1+21)
+      CALL PUTATT(RPT,PTR,ATTI7,ATTI7-1+23)
+      CALL PUTATT(RPT,PTR,ATTI8,ATTI8-1+25)
+      CALL PUTATT(RPT,PTR,ATTI9,ATTI9-1+17)
+!      CALL PUTATT(RPT,PTR,ATTI95,ATTI95-1+15)
+!      CALL PUTATT(RPT,PTR,ATTI96,ATTI96-1+19)
+!      CALL PUTATT(RPT,PTR,ATTI97,ATTI97-1+9)
+      CALL PUTATT(RPT,PTR,ATTI98,ATTI98-1+8)
+      CALL PUTATT(RPT,PTR,ATTI99,ATTI99-1+4)
+      RPT(24:25)=' 1'
+      RPT(26:26)=B36(ATTC,'*',1)
+      RETURN
+!-----------------------------------------------------------------------3456789
+      ENTRY PUTSUB(RPT,CTRUE,ITRUE,FTRUE,FMISS,FERR                           &
+     &,ILEN,ABBR,FMIN1,FUNITS,ITYPE,RPTID,NUM,BEG,END)
+! CONVERT SUBSIDIARY FLOATING POINT VALUES TO CHARACTERS
+!
+      IF (INITICN(ABBR,FMIN1,NUM).NE.ATTI99) STOP 'PUTSUB INITICN'
+      RPT=' '
+      PTR=15
+      ATTC=0
+      IF (BEG.LT.ATTI95) THEN
+        CALL PUTATT(RPT,PTR,BEG,END)
+      ELSE IF (BEG.EQ.ATTI95) THEN
+        DO J=1,NREAN
+          CTRUE(ATTI95:ATTI95-1+15)(:16)=CREAN(:,J)
+          FTRUE(ATTI95:ATTI95-1+15)=FREAN(:,J)
+          PN=GETPN(NINT(FTRUE(ATTI95-1+3)),NINT(FTRUE(ATTI95-1+4)))
+          CALL SETINHR(PN)
+          CALL PUTATT(RPT,PTR,ATTI95,ATTI95-1+15)
+          IREAN(:,J)=ITRUE(ATTI95:ATTI95-1+15)
+          CREAN(:,J)=CTRUE(ATTI95:ATTI95-1+15)
+        ENDDO
+      ELSE IF (BEG.EQ.ATTI96) THEN
+        DO J=1,NIVAD
+          CTRUE(ATTI96:ATTI96-1+19)(:16)=CIVAD(:,J)
+          FTRUE(ATTI96:ATTI96-1+19)=FIVAD(:,J)
+          PN=GETPN(NINT(FTRUE(ATTI96-1+3)),NINT(FTRUE(ATTI96-1+4)))
+          CALL SETINHI(PN)
+          CALL PUTATT(RPT,PTR,ATTI96,ATTI96-1+19)
+          IIVAD(:,J)=ITRUE(ATTI96:ATTI96-1+19)
+          CIVAD(:,J)=CTRUE(ATTI96:ATTI96-1+19)
+        ENDDO
+      ELSE IF (BEG.EQ.ATTI97) THEN
+        DO J=1,NERROR
+          CTRUE(ATTI97:ATTI97-1+9)(:16)=CERROR(:,J)
+          FTRUE(ATTI97:ATTI97-1+9)=FERROR(:,J)
+          PN=GETPN(NINT(FTRUE(ATTI97-1+3)),NINT(FTRUE(ATTI97-1+4)))
+          CALL SETINHE(PN)
+          CALL PUTATT(RPT,PTR,ATTI97,ATTI97-1+9)
+          IERROR(:,J)=ITRUE(ATTI97:ATTI97-1+9)
+          CERROR(:,J)=CTRUE(ATTI97:ATTI97-1+9)
+        ENDDO
+      ENDIF
+      IF (PTR.GT.15) THEN
+        PTR=0
+        CALL PUTATT(RPT,PTR,ATTI98,ATTI98-1+8)
+      ENDIF
+      RETURN
+!-----------------------------------------------------------------------
+      CONTAINS
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE GETATT(STR,TRS,BEG,END)
+! GET IN STR AT TRS THE ATTACHMENT BEG THRU END
+      IMPLICIT INTEGER(A-E,G-Z)
+      CHARACTER*(*)STR
+      INTEGER I
+!
+      DO I=BEG,END
+        IF (ILEN(I).NE.1024) THEN
+          IF (ILEN(I).GT.LEN(CTRUE(I))) STOP 'GETATT LEN CTRUE'
+          IF (TRS+ILEN(I).GT.LEN(STR)) STOP 'GETATT LEN RPT'
+          CTRUE(I)(:ILEN(I))=STR(TRS+1:TRS+ILEN(I))
+          TRS=TRS+ILEN(I)
+        ELSE
+          CTRUE(I)(:)=STR(TRS+1:)
+          IF (CTRUE(I)(:).NE.STR(TRS+1:)) STOP 'GETATT LEN SUPD'
+          TRS=TRS+LEN_TRIM(STR(TRS+1:))
+        ENDIF
+!
+        IF (CTRUE(I)(:MIN(ILEN(I),LEN(CTRUE(I)))).EQ.' ') THEN
+          ITRUE(I)=NINT(FMISS)
+        ELSE IF (ITYPE(I).EQ.1) THEN
+          READ(CTRUE(I)(:ILEN(I)),IFMT(ILEN(I)),IOSTAT=IOS)ITRUE(I)
+          IF (IOS.NE.0) ITRUE(I)=NINT(FERR)
+        ELSE IF (ITYPE(I).EQ.2) THEN
+          ITRUE(I)=IB36(CTRUE(I)(:ILEN(I)),NINT(FERR),ILEN(I))
+        ELSE
+          ITRUE(I)=ICHAR(CTRUE(I)(:1))
+        ENDIF
+!
+        IF (ITRUE(I).EQ.NINT(FMISS)) THEN
+          FTRUE(I)=FMISS
+        ELSE IF (ITRUE(I).EQ.NINT(FERR)) THEN
+          FTRUE(I)=FERR
+        ELSE IF (ITYPE(I).LE.2) THEN
+          FTRUE(I)=ITRUE(I)*FUNITS(I)
+        ELSE
+          FTRUE(I)=ITRUE(I)
+        ENDIF
+      ENDDO
+      ATTC=ATTC+1
+      END SUBROUTINE GETATT
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE PUTATT(STR,TRS,BEG,END)
+! PUT IN STR AT TRS THE ATTACHMENT BEG THRU END
+      IMPLICIT INTEGER(A-E,G-Z)
+      CHARACTER*(*)STR
+      INTEGER I
+!
+      IF (ADJUSTL(ABBR(BEG)).EQ.'ATTI') THEN
+        IF (ALL(FTRUE(BEG+2:END).EQ.FMISS)) RETURN
+        FTRUE(BEG)=FMIN1(BEG)
+        FTRUE(BEG+1)=FMIN1(BEG+1)
+      ENDIF
+      DO I=BEG,END
+        IF (FTRUE(I).EQ.FMISS) THEN
+          ITRUE(I)=NINT(FMISS)
+        ELSE IF (FTRUE(I).EQ.FERR) THEN
+          ITRUE(I)=NINT(FERR)
+        ELSE IF (ITYPE(I).LE.2) THEN
+          ITRUE(I)=NINT(FTRUE(I)/FUNITS(I))
+        ELSE
+          ITRUE(I)=NINT(FTRUE(I))
+        ENDIF
+!
+        IF (ITRUE(I).EQ.NINT(FMISS)) THEN
+          CTRUE(I)(:MIN(ILEN(I),LEN(CTRUE(I))))=' '
+        ELSE IF (ITYPE(I).EQ.1) THEN
+          WRITE(CTRUE(I)(:ILEN(I)),IFMT(ILEN(I)))ITRUE(I)
+        ELSE IF (ITYPE(I).EQ.2) THEN
+          CTRUE(I)(:ILEN(I))=B36(ITRUE(I),'*',ILEN(I))
+        ELSE
+!          CTRUE(I)(:ILEN(I))=REPEAT(CHAR(ITRUE(I)),16)
+        ENDIF
+!
+        IF (ILEN(I).NE.1024) THEN
+          IF (ILEN(I).GT.LEN(CTRUE(I))) STOP 'PUTATT LEN CTRUE'
+          IF (TRS+ILEN(I).GT.LEN(STR)) STOP 'PUTATT LEN RPT'
+          STR(TRS+1:TRS+ILEN(I))=CTRUE(I)(:ILEN(I))
+          TRS=TRS+ILEN(I)
+        ELSE
+          STR(TRS+1:)=CTRUE(I)(:)
+          IF (CTRUE(I)(:).NE.STR(TRS+1:)) STOP 'PUTATT LEN SUPD'
+          TRS=TRS+LEN_TRIM(STR(TRS+1:))
+        ENDIF
+      ENDDO
+      ATTC=ATTC+1
+      END SUBROUTINE PUTATT
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE SETINHR(PN)
+! SET REANALYSES ATTACHMENT INHERITED ATTRIBUTES
+      INTEGER I
+      DO I=0,3
+        FMIN1(ATTI95-1+8+I*NUM)=FMIN1(PN+I*NUM)
+        FMIN1(ATTI95-1+10+I*NUM)=FMIN1(PN+I*NUM)
+        FMIN1(ATTI95-1+12+I*NUM)=FMIN1(PN+I*NUM)
+      ENDDO
+      FUNITS(ATTI95-1+8:ATTI95-1+12)=FUNITS(PN)/10.
+      END SUBROUTINE SETINHR
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE SETINHI(PN)
+! SET IVAD ATTACHMENT INHERITED ATTRIBUTES
+      INTEGER I
+      DO I=0,3
+        FMIN1(ATTI96-1+6+I*NUM)=FMIN1(PN+I*NUM)
+      ENDDO
+      WHERE (FTRUE(ATTI96-1+5:ATTI96-1+14:3).NE.FMISS)
+        FUNITS(ATTI96-1+6:ATTI96-1+15:3)=1./(10.**                            &
+     &   FTRUE(ATTI96-1+5:ATTI96-1+14:3))
+      ELSEWHERE
+        FUNITS(ATTI96-1+6:ATTI96-1+15:3)=1.
+      ENDWHERE
+      END SUBROUTINE SETINHI
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE SETINHE(PN)
+! SET ERROR ATTACHMENT INHERITED ATTRIBUTES
+      INTEGER I
+      DO I=0,3
+        FMIN1(ATTI97-1+6+I*NUM)=FMIN1(PN+I*NUM)
+      ENDDO
+      FUNITS(ATTI97-1+6)=FUNITS(PN)
+      ITYPE(ATTI97-1+6)=ITYPE(PN)
+      END SUBROUTINE SETINHE
+      END
+!-----------------------------------------------------------------------3456789
+      INTEGER FUNCTION INITICN(ABBR,FMIN1,NUM)
+! INITIALIZE PARAMETER TABLE AND COMPONENT NUMBER AND FIELD NUMBER LISTS
+      IMPLICIT INTEGER(A-E,G-Z)
+      INTEGER FN
+      CHARACTER*(*) ABBR
+      DIMENSION ABBR(NUM),FMIN1(NUM)
+      INTEGER, DIMENSION(:,:), ALLOCATABLE :: LIST
+      INTEGER, DIMENSION(0:99,99) :: TABLE=0
+      SAVE LIST,TABLE
+!
+      IF (ADJUSTL(ABBR(1)).NE.'YR') STOP 'INITICN 1ST'
+      IF (ADJUSTL(ABBR(NUM)).NE.'SUPD') STOP 'INITICN NUM'
+      IF (TABLE(99,1).EQ.0) CALL INIT()
+      INITICN=TABLE(99,1)
+      RETURN
+!-----------------------------------------------------------------------3456789
+      ENTRY GETPN(ICN,FN)
+! PARAMETER NUMBER OF A COMPONENT NUMBER AND A FIELD NUMBER
+      IF (TABLE(99,1).EQ.0) STOP 'GETPN TABLE'
+      IF (ICN.LT.0 .OR. ICN.GT.99) STOP 'GETPN ICN'
+      IF (FN.LT.1 .OR. FN.GT.99) STOP 'GETPN FN'
+      IF (TABLE(ICN,FN).EQ.0) STOP 'GETPN ICN FN'
+      GETPN=TABLE(ICN,FN)
+      RETURN
+!-----------------------------------------------------------------------3456789
+      ENTRY GETICN(PN)
+! COMPONENT NUMBER OF A PARAMETER NUMBER
+      IF (TABLE(99,1).EQ.0) STOP 'GETICN TABLE'
+      IF (PN.LT.1 .OR. PN.GT.UBOUND(LIST,2)) STOP 'GETICN PN'
+      GETICN=LIST(1,PN)
+      RETURN
+!-----------------------------------------------------------------------3456789
+      ENTRY GETFN(PN)
+! FIELD NUMBER OF A PARAMETER NUMBER
+      IF (TABLE(99,1).EQ.0) STOP 'GETFN TABLE'
+      IF (PN.LT.1 .OR. PN.GT.UBOUND(LIST,2)) STOP 'GETFN PN'
+      GETFN=LIST(2,PN)
+      RETURN
+!-----------------------------------------------------------------------3456789
+      CONTAINS
+!-----------------------------------------------------------------------3456789
+        SUBROUTINE INIT()
+! SEE INITICN
+        INTEGER ICN,FN,PN
+!
+        ALLOCATE(LIST(2,NUM))
+        ICN=0
+        FN=0
+        DO I=1,NUM
+          IF (ADJUSTL(ABBR(I)).EQ.'ATTI') THEN
+            ICN=NINT(FMIN1(I))
+            FN=0
+          ENDIF
+          FN=FN+1
+          LIST(1,I)=ICN
+          LIST(2,I)=FN
+          TABLE(ICN,FN)=I
+        ENDDO
+        END SUBROUTINE INIT
+      END
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE MINMAX(CTRUE,ITRUE,FTRUE,FMISS,FERR                          &
+     &,ILEN,FMIN1,FMAX1,FMIN2,FMAX2,FUNITS,ITYPE,NUM)
+! SET EXTREME FLOATING POINT VALUES TO ERROR VALUE
+      IMPLICIT INTEGER(A-E,G-Z)
+      CHARACTER*(*) CTRUE
+      DIMENSION CTRUE(NUM),ITRUE(NUM),FTRUE(NUM)                              &
+     &,ILEN(NUM),FMIN1(NUM),FMAX1(NUM),FMIN2(NUM),FMAX2(NUM)                  &
+     &,FUNITS(NUM),ITYPE(NUM)
+!
+      DO 190 I=1,NUM
+        IF (ITYPE(I).LE.2) THEN
+          IF (FTRUE(I).EQ.FMISS .OR. FTRUE(I).EQ.FERR) THEN
+            ITRUE(I)=NINT(FTRUE(I))
+            GOTO 190
+          ENDIF
+          ITRUE(I)=NINT(FTRUE(I)/FUNITS(I))
+          IF (ITRUE(I).GE.NINT(FMIN1(I)/FUNITS(I))                            &
+     &   .AND.ITRUE(I).LE.NINT(FMAX1(I)/FUNITS(I))                            &
+     &   .OR. FMIN2(I).NE.FMISS                                               &
+     &   .AND.ITRUE(I).GE.NINT(FMIN2(I)/FUNITS(I))                            &
+     &   .AND.ITRUE(I).LE.NINT(FMAX2(I)/FUNITS(I))) THEN
+          ELSE
+            FTRUE(I)=FERR
+            ITRUE(I)=NINT(FERR)
+          ENDIF
+        ELSE
+          IF (ILEN(I).EQ.1024) THEN
+            LENGTH=LEN(CTRUE(I))
+          ELSE
+            IF (ILEN(I).GT.LEN(CTRUE(I))) STOP 'MINMAX LEN CTRUE'
+            LENGTH=ILEN(I)
+          ENDIF
+          IF (CTRUE(I)(:LENGTH).EQ.' ') THEN
+            FTRUE(I)=FMISS
+            ITRUE(I)=NINT(FMISS)
+            GOTO 190
+          ENDIF
+          FTRUE(I)=ICHAR(CTRUE(I)(:1))
+          ITRUE(I)=NINT(FTRUE(I))
+          DO 180 J=1,LENGTH
+            IF (LGE(CTRUE(I)(J:J),'A')                                        &
+     &     .AND.LLE(CTRUE(I)(J:J),'Z')                                        &
+     &     .OR. NINT(FMIN1(I)).LE.48                                          &
+     &     .AND.LGE(CTRUE(I)(J:J),'0')                                        &
+     &     .AND.LLE(CTRUE(I)(J:J),'9')                                        &
+     &     .OR. NINT(FMIN1(I)).EQ.32                                          &
+     &     .AND.LGE(CTRUE(I)(J:J),' ')                                        &
+     &     .AND.LLE(CTRUE(I)(J:J),'~')) THEN
+            ELSE
+              FTRUE(I)=FERR
+              ITRUE(I)=NINT(FERR)
+              GOTO 190
+            ENDIF
+  180     CONTINUE
+        ENDIF
+  190 CONTINUE
+      END
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE SAVSUM(CTRUE,FTRUE,FMISS,FERR                                &
+     &,ILEN,ABBR,NUM)
+! SAVE SUMMARY INFORMATION
+      IMPLICIT INTEGER(A-E,G-Z)
+      CHARACTER*(*) PROGID,ABBR,CTRUE
+      DIMENSION CTRUE(NUM),FTRUE(NUM),ILEN(NUM),ABBR(NUM)
+      CHARACTER*64 STR
+      DIMENSION SUM1(1024),SUM2(1024),SUM3(1024)
+      DATA SUM1,SUM2,SUM3/1024*0,1024*0,1024*0/
+      SAVE SUM1,SUM2,SUM3
+      PC(A1,A2)=NINT(A1*100./MAX(A2,1))
+!
+      DO 190 I=1,NUM
+        IF (FTRUE(I).NE.FMISS .AND. FTRUE(I).NE.FERR) THEN
+          SUM1(I)=SUM1(I)+1
+        ELSE
+          SUM2(I)=SUM2(I)+1
+          IF (FTRUE(I).EQ.FMISS) THEN
+            IF (ILEN(I).EQ.1024) THEN
+              IF (CTRUE(I)(:).EQ.' ') GOTO 190
+            ELSE
+              IF (ILEN(I).GT.LEN(CTRUE(I))) STOP 'SAVSUM LEN CTRUE'
+              IF (CTRUE(I)(:ILEN(I)).EQ.' ') GOTO 190
+            ENDIF
+          ENDIF
+          SUM3(I)=SUM3(I)+1
+          WRITE(STR,'(I3,1X,A5,2X,A53)')I,ABBR(I),CTRUE(I)
+          CALL SAVSTR(STR)
+        ENDIF
+  190 CONTINUE
+      RETURN
+!-----------------------------------------------------------------------3456789
+      ENTRY PRNSUM(UNIT,PROGID,ABBR,NUM)
+! PRINT SUMMARY INFORMATION TO UNIT
+!
+      WRITE(UNIT,'(A)')PROGID
+      WRITE(UNIT,'(/1X,A)')'SUMMARY OF FIELDS'
+      WRITE(UNIT,'(A6,2(2X,A10,A11,A13))')'FIELD'                             &
+     &,'# EXTANT','# MISSING','# ERRONEOUS'                                   &
+     &,'% EXTANT','% MISSING','% ERRONEOUS'
+      DO 290 I=1,NUM
+        IF (SUM1(I).GT.0 .OR. SUM3(I).GT.0) THEN
+          TOTAL=SUM1(I)+SUM2(I)
+          WRITE(UNIT,'(1X,A5,2(2X,I10,I11,I13))')ABBR(I)                      &
+     &    ,   SUM1(I)       ,   SUM2(I)       ,   SUM3(I)                     &
+     &    ,PC(SUM1(I),TOTAL),PC(SUM2(I),TOTAL),PC(SUM3(I),TOTAL)
+        ENDIF
+        SUM1(I)=0
+        SUM2(I)=0
+        SUM3(I)=0
+  290 CONTINUE
+      WRITE(UNIT,'(/1X,A)')'SUMMARY OF ERRORS'
+      WRITE(UNIT,'(A6,2X,A,T70,A)')'FIELD','ERROR','FREQUENCY'
+      CALL PRNSTR(UNIT)
+      END
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE SAVSTR(STR)
+! SAVE FREQUENCY OF STRING
+      IMPLICIT INTEGER(A-E,G-Z)
+      PARAMETER(MMAX=10000)
+      CHARACTER*64 STR,ARR1
+      DIMENSION ARR1(MMAX),ARR2(MMAX)
+      DATA M/0/
+      SAVE
+!
+      DO 190 I=1,M
+        IF (STR.NE.ARR1(I)) GOTO 190
+        ARR2(I)=ARR2(I)+1
+        RETURN
+  190 CONTINUE
+      IF (M+1.GE.MMAX) STOP 'SAVSTR INCREASE MMAX'
+      M=M+1
+      ARR1(M)=STR
+      ARR2(M)=1
+      RETURN
+!-----------------------------------------------------------------------3456789
+      ENTRY PRNSTR(UNIT)
+! PRINT FREQUENCY OF STRING
+!
+      DO 290 K=1,M-1
+        J=K
+        DO 280 L=K+1,M
+          IF (LLT(ARR1(L),ARR1(J))) J=L
+  280   CONTINUE
+        IF (J.NE.K) THEN
+          ARR1(MMAX)=ARR1(K)
+          ARR2(MMAX)=ARR2(K)
+          ARR1(K)=ARR1(J)
+          ARR2(K)=ARR2(J)
+          ARR1(J)=ARR1(MMAX)
+          ARR2(J)=ARR2(MMAX)
+        ENDIF
+  290 CONTINUE
+      WRITE(UNIT,'(A,T70,I9)')(ARR1(I)(4:),ARR2(I),I=1,M)
+      M=0
+      END
+!-----------------------------------------------------------------------3456789
+      FUNCTION IB36(B36,IERR,ILEN)
+! CONVERT FROM BASE 36 CHARACTER STRING TO INTEGER
+      IMPLICIT INTEGER(A-Z)
+      CHARACTER (LEN=*) B36,STR
+      PARAMETER(STR='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+!
+      IB36=IERR
+      J=VERIFY(B36(:ILEN),' ')
+      IF (J.EQ.0 .OR. ILEN+1-J.GT.5) RETURN
+      IF (VERIFY(B36(J:ILEN),STR).NE.0) RETURN
+!
+      IB36=0
+      INT=1
+      DO J=ILEN,1,-1
+        IF (B36(:J).EQ.' ') EXIT
+        IB36=(INDEX(STR,B36(J:J))-1)*INT+IB36
+        INT=INT*36
+      ENDDO
+      END
+!-----------------------------------------------------------------------3456789
+      FUNCTION B36(IB36,ERR,ILEN)
+! CONVERT FROM INTEGER TO BASE 36 CHARACTER STRING
+      IMPLICIT INTEGER(A-Z)
+      CHARACTER (LEN=*) B36,STR
+      PARAMETER(STR='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+      CHARACTER ERR
+!
+      B36=REPEAT(ERR,ILEN)
+      J=MIN(ILEN,5)
+      IF (IB36.LT.0 .OR. IB36.GT.36**J-1) RETURN
+!
+      B36=REPEAT(' ',ILEN-1)//'0'
+      INT=1
+      DO J=ILEN,1,-1
+        IF (IB36/INT.EQ.0) EXIT
+        B36(J:J)=STR(MOD(IB36/INT,36)+1:)
+        INT=INT*36
+      ENDDO
+      END
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE GETUID(CTRUE)
+! GET UNIQUE REPORT ID
+      CHARACTER*6 CTRUE
+!
+      OPEN(98,FILE='LAST_UID')
+      READ(98,'(A)')CTRUE
+      CALL B36INC(CTRUE)
+      REWIND(98)
+      WRITE(98,'(A)')CTRUE
+      CLOSE(98)
+      END
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE B36INC(B36)
+! INCREMENT BASE 36 CHARACTER STRING
+      IMPLICIT INTEGER(A-Z)
+      CHARACTER (LEN=*) B36,STR
+      PARAMETER(STR='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+!
+      IF (VERIFY(B36,STR).EQ.0) THEN
+        DO J=LEN(B36),1,-1
+          NDX=INDEX(STR,B36(J:J))
+          IF (NDX.LT.36) THEN
+            B36(J:J)=STR(NDX+1:NDX+1)
+            RETURN
+          ELSE
+            B36(J:J)=STR(1:1)
+          ENDIF
+        ENDDO
+      ENDIF
+      STOP 'B36INC'
+      END
+!-----------------------------------------------------------------------3456789
+      SUBROUTINE EAST(ITRUE,FTRUE,FERR)
+! CONVERT LONGITUDE TO DEGREES EAST
+      IMPLICIT INTEGER(A-E,G-Z)
+!
+      ITRUE=NINT(FTRUE/0.01)
+      IF(ITRUE.GE.-36000 .AND. ITRUE.LE.36000)THEN
+        ITRUE=MOD(ITRUE+36000,36000)
+        FTRUE=ITRUE*0.01
+      ELSE
+        ITRUE=NINT(FERR)
+        FTRUE=FERR
+      ENDIF
+      END
+!-----------------------------------------------------------------------3456789
+      BLOCK DATA BDIMMA
+! COMMON BLOCK DATA STATEMENTS
+      IMPLICIT INTEGER(A-E,G-Z)
+!
+!     missing = -9999999
+!     ILEN    = field length
+!     ABBR    = field abbreviation
+!     FMIN1   = field range minimum (first, or only)
+!     FMAX1   = field range maximum (first, or only)
+!     FMIN2   = field range minimum (second, or missing)
+!     FMAX2   = field range maximum (second, or missing)
+!     FUNITS  = field units (missing, if itype=3)
+!     ITYPE   = 1: numeric:   decimal range(s)
+!               2: numeric:   decimal range(s), transformed to base36
+!               3: character: decimal range(s), transformed to ascii
+!     RPTID   = 1 (IMMA version that the program can write)
+!
+      PARAMETER(NUM=305)
+      CHARACTER*8 ABBR,RPTID
+      COMMON /IMMA1/ILEN(NUM),ABBR(NUM),FMIN1(NUM),FMAX1(NUM)                 &
+     &,FMIN2(NUM),FMAX2(NUM),FUNITS(NUM),ITYPE(NUM),RPTID
+      DATA RPTID/' 1'/
+      CHARACTER*16 CREAN,CIVAD,CERROR
+      COMMON /REAN/CREAN(15,100),IREAN(15,100),FREAN(15,100),NREAN
+      COMMON /IVAD/CIVAD(19,100),IIVAD(19,100),FIVAD(19,100),NIVAD
+      COMMON /ERROR/CERROR(9,100),IERROR(9,100),FERROR(9,100),NERROR
+      DATA NREAN,NIVAD,NERROR/3*0/
+!
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=1,18)/                                            &
+     &   4,'   YR', 1600.   , 2024.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   MO',    1.   ,   12.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   DY',    1.   ,   31.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   4,'   HR',    0.00 ,   23.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   5,'  LAT',  -90.00 ,   90.00 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   6,'  LON',    0.00 ,  359.99 , -179.99 ,  180.00 , 0.01    , 1,      &
+     &   2,'   IM',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' ATTC',    0.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'   TI',    0.   ,    3.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   LI',    0.   ,    6.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   DS',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   VS',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  NID',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   II',    0.   ,   10.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   9,'   ID',   32.   ,  126.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   2,'   C1',   48.   ,   57.   ,   65.   ,   90.   ,-9999999., 3,      &
+     &   1,'   DI',    0.   ,    6.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'    D',    1.   ,  362.   ,-9999999.,-9999999., 1.      , 1/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=19,36)/                                           &
+     &   1,'   WI',    0.   ,    8.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'    W',    0.0  ,   99.9  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   1,'   VI',    0.   ,    2.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   VV',   90.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   WW',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   W1',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   5,'  SLP',  870.0  , 1074.6  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   1,'    A',    0.   ,    8.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'  PPP',    0.0  ,   51.0  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   1,'   IT',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   4,'   AT',  -99.9  ,   99.9  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   1,' WBTI',    0.   ,    3.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   4,'  WBT',  -99.9  ,   99.9  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   1,' DPTI',    0.   ,    3.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   4,'  DPT',  -99.9  ,   99.9  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   2,'   SI',    0.   ,   12.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   4,'  SST',  -99.9  ,   99.9  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   1,'    N',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=37,54)/                                           &
+     &   1,'   NH',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   CL',    0.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'   HI',    0.   ,    1.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'    H',    0.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'   CM',    0.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'   CH',    0.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   2,'   WD',    0.   ,   38.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   WP',    0.   ,   30.   ,   99.   ,   99.   , 1.      , 1,      &
+     &   2,'   WH',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   SD',    0.   ,   38.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   SP',    0.   ,   30.   ,   99.   ,   99.   , 1.      , 1,      &
+     &   2,'   SH',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,' ATTI',    1.   ,    1.   ,    1.   ,    1.   , 1.      , 1,      &
+     &   2,' ATTL',   65.   ,   65.   ,   65.   ,   65.   , 1.      , 1,      &
+     &   1,'  BSI',-9999999.,-9999999.,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'  B10',    1.   ,  648.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   B1',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'  DCK',    0.   ,  999.   ,-9999999.,-9999999., 1.      , 1/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=55,72)/                                           &
+     &   3,'  SID',    0.   ,  999.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   PT',    0.   ,   21.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,' DUPS',    0.   ,   14.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' DUPC',    0.   ,    2.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   TC',    0.   ,    1.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   PB',    0.   ,    2.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   WX',    1.   ,    1.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   SX',    1.   ,    1.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   C2',    0.   ,   40.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  SQZ',    1.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  SQA',    1.   ,   21.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  AQZ',    1.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  AQA',    1.   ,   21.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  UQZ',    1.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  UQA',    1.   ,   21.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  VQZ',    1.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  VQA',    1.   ,   21.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  PQZ',    1.   ,   35.   ,-9999999.,-9999999., 1.      , 2/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=73,90)/                                           &
+     &   1,'  PQA',    1.   ,   21.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  DQZ',    1.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  DQA',    1.   ,   21.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'   ND',    1.   ,    2.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   SF',    1.   ,   15.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'   AF',    1.   ,   15.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'   UF',    1.   ,   15.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'   VF',    1.   ,   15.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'   PF',    1.   ,   15.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'   RF',    1.   ,   15.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  ZNC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  WNC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  BNC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  XNC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  YNC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  PNC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  ANC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  GNC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=91,108)/                                          &
+     &   1,'  DNC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  SNC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  CNC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  ENC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  FNC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  TNC',    1.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   2,'  QCE',    0.   ,   63.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   LZ',    1.   ,    1.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  QCZ',    0.   ,   31.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,' ATTI',    5.   ,    5.   ,    5.   ,    5.   , 1.      , 1,      &
+     &   2,' ATTL',   94.   ,   94.   ,   94.   ,   94.   , 1.      , 1,      &
+     &   1,'   OS',    0.   ,    6.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   OP',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   FM',    0.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,' IMMV',    0.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'   IX',    1.   ,    7.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   W2',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  WMI',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=109,126)/                                         &
+     &   2,'  SD2',    0.   ,   38.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  SP2',    0.   ,   30.   ,   99.   ,   99.   , 1.      , 1,      &
+     &   2,'  SH2',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   IS',    1.   ,    5.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   ES',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   RS',    0.   ,    4.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  IC1',    0.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  IC2',    0.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  IC3',    0.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  IC4',    0.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  IC5',    0.   ,   10.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'   IR',    0.   ,    4.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'  RRR',    0.   ,  999.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   TR',    1.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   NU',   32.   ,  126.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   1,'  QCI',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  QI1',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  QI2',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=127,144)/                                         &
+     &   1,'  QI3',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  QI4',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  QI5',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  QI6',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  QI7',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  QI8',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  QI9',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI10',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI11',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI12',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI13',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI14',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI15',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI16',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI17',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI18',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI19',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI20',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=145,162)/                                         &
+     &   1,' QI21',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'  HDG',    0.   ,  360.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'  COG',    0.   ,  360.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  SOG',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  SLL',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,' SLHH',  -99.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'  RWD',    1.   ,  362.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'  RWS',    0.0  ,   99.9  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   1,' QI22',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI23',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI24',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI25',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI26',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI27',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI28',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' QI29',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   4,'   RH',    0.0  ,  100.0  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   1,'  RHI',    0.   ,    4.   ,-9999999.,-9999999., 1.      , 1/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=163,180)/                                         &
+     &   1,' AWSI',    0.   ,    2.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   7,'IMONO',    0.   ,9999999. ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,' ATTI',    6.   ,    6.   ,    6.   ,    6.   , 1.      , 1,      &
+     &   2,' ATTL',   68.   ,   68.   ,   68.   ,   68.   , 1.      , 1,      &
+     &   4,' CCCC',   65.   ,   90.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   6,' BUID',   48.   ,   57.   ,   65.   ,   90.   ,-9999999., 3,      &
+     &   1,'FBSRC',    0.   ,    0.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   5,'  BMP',  870.0  , 1074.6  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   4,' BSWU',  -99.9  ,   99.9  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   4,'  SWU',  -99.9  ,   99.9  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   4,' BSWV',  -99.9  ,   99.9  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   4,'  SWV',  -99.9  ,   99.9  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   4,' BSAT',  -99.9  ,   99.9  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   3,' BSRH',    0.   ,  100.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'  SRH',    0.   ,  100.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   5,' BSST', -99.99  ,  99.99  ,-9999999.,-9999999., 0.01    , 1,      &
+     &   1,'  MST',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   4,'  MSH', -999.   , 9999.   ,-9999999.,-9999999., 1.      , 1/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=181,198)/                                         &
+     &   4,'   BY',    0.   , 9999.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   BM',    1.   ,   12.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   BD',    1.   ,   31.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'   BH',    0.   ,   23.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  BFL',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,' ATTI',    7.   ,    7.   ,    7.   ,    7.   , 1.      , 1,      &
+     &   2,' ATTL',   58.   ,   58.   ,   58.   ,   58.   , 1.      , 1,      &
+     &   1,'  MDS',    0.   ,    2.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  C1M',   65.   ,   90.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   2,'  OPM',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  KOV',   32.   ,  126.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   2,'  COR',   65.   ,   90.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   3,'  TOB',   32.   ,  126.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   3,'  TOT',   32.   ,  126.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   2,'  EOT',   32.   ,  126.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   2,'  LOT',   32.   ,  126.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   1,'  TOH',   32.   ,  126.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   2,'  EOH',   32.   ,  126.   ,-9999999.,-9999999.,-9999999., 3/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=199,216)/                                         &
+     &   3,'  SIM',   32.   ,  126.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   3,'  LOV',    0.   ,  999.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  DOS',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'  HOP',    0.   ,  999.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'  HOT',    0.   ,  999.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'  HOB',    0.   ,  999.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'  HOA',    0.   ,  999.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   5,'  SMF',    0.   ,99999.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   5,'  SME',    0.   ,99999.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  SMV',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,' ATTI',    8.   ,    8.   ,    8.   ,    8.   , 1.      , 1,      &
+     &   2,' ATTL',  102.   ,  102.   ,  102.   ,  102.   , 1.      , 2,      &
+     &   5,'  OTV',  -3.000 ,  38.999 ,-9999999.,-9999999., 0.001   , 1,      &
+     &   4,'  OTZ',    0.00 ,   99.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   5,'  OSV',   0.000 ,  40.999 ,-9999999.,-9999999., 0.001   , 1,      &
+     &   4,'  OSZ',    0.00 ,   99.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   4,'  OOV',    0.00 ,   12.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   4,'  OOZ',    0.00 ,   99.99 ,-9999999.,-9999999., 0.01    , 1/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=217,234)/                                         &
+     &   4,'  OPV',    0.00 ,   30.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   4,'  OPZ',    0.00 ,   99.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   5,' OSIV',    0.00 ,  250.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   4,' OSIZ',    0.00 ,   99.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   5,'  ONV',    0.00 ,  500.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   4,'  ONZ',    0.00 ,   99.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   3,' OPHV',    6.20 ,    9.20 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   4,' OPHZ',    0.00 ,   99.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   4,'  OCV',    0.00 ,   50.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   4,'  OCZ',    0.00 ,   99.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   3,'  OAV',    0.00 ,    3.10 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   4,'  OAZ',    0.00 ,   99.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   4,' OPCV',    0.0  ,  999.0  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   4,' OPCZ',    0.00 ,   99.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   2,'  ODV',    0.0  ,    4.0  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   4,'  ODZ',    0.00 ,   99.99 ,-9999999.,-9999999., 0.01    , 1,      &
+     &  10,' PUID',   32.   ,  126.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   2,' ATTI',    9.   ,    9.   ,    9.   ,    9.   , 1.      , 1/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=235,252)/                                         &
+     &   2,' ATTL',   32.   ,   32.   ,   32.   ,   32.   , 1.      , 1,      &
+     &   1,'  CCE',    0.   ,   13.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   2,'  WWE',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   NE',    0.   ,    8.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  NHE',    0.   ,    8.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   HE',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  CLE',    0.   ,   11.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  CME',    0.   ,   12.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  CHE',    0.   ,    9.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   3,'   AM',    0.   ,    8.00 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   3,'   AH',    0.   ,    8.00 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   1,'   UM',    0.   ,    8.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'   UH',    0.   ,    8.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  SBI',    0.   ,    1.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   4,'   SA',  -90.0  ,   90.0  ,-9999999.,-9999999., 0.1     , 1,      &
+     &   4,'   RI',   -1.10 ,    1.17 ,-9999999.,-9999999., 0.01    , 1,      &
+     &   2,' ATTI',   95.   ,   95.   ,   95.   ,   95.   , 1.      , 1,      &
+     &   2,' ATTL',   61.   ,   61.   ,   61.   ,   61.   , 1.      , 1/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=253,270)/                                         &
+     &   2,' ICNR',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  FNR',    1.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,' DPRO',    1.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,' DPRP',    1.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  UFR',    1.   ,    6.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   7,' MFGR',-999999. ,9999999. ,-9999999.,-9999999., 1.      , 1,      &
+     &   7,'MFGSR',-999999. ,9999999. ,-9999999.,-9999999., 1.      , 1,      &
+     &   7,'  MAR',-999999. ,9999999. ,-9999999.,-9999999., 1.      , 1,      &
+     &   7,' MASR',-999999. ,9999999. ,-9999999.,-9999999., 1.      , 1,      &
+     &   7,'  BCR',-999999. ,9999999. ,-9999999.,-9999999., 1.      , 1,      &
+     &   4,' ARCR',   48.   ,   57.   ,   65.   ,   90.   ,-9999999., 3,      &
+     &   8,'  CDR',   48.   ,   57.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   1,' ASIR',    0.   ,    1.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,' ATTI',   96.   ,   96.   ,   96.   ,   96.   , 1.      , 1,      &
+     &   2,' ATTL',   53.   ,   53.   ,   53.   ,   53.   , 1.      , 1,      &
+     &   2,' ICNI',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  FNI',    1.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,' JVAD',    0.   ,   35.   ,-9999999.,-9999999., 1.      , 2/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=271,288)/                                         &
+     &   6,'  VAD',-99999.  ,999999.  ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'IVAU1',    1.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'JVAU1',    0.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   6,' VAU1',-99999.  ,999999.  ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'IVAU2',    1.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'JVAU2',    0.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   6,' VAU2',-99999.  ,999999.  ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'IVAU3',    1.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'JVAU3',    0.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   6,' VAU3',-99999.  ,999999.  ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  VQC',    1.   ,    4.   ,    9.   ,    9.   , 1.      , 1,      &
+     &   4,' ARCI',   48.   ,   57.   ,   65.   ,   90.   ,-9999999., 3,      &
+     &   8,'  CDI',   48.   ,   57.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   1,' ASII',    0.   ,    1.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,' ATTI',   97.   ,   97.   ,   97.   ,   97.   , 1.      , 1,      &
+     &   2,' ATTL',   32.   ,   32.   ,   32.   ,   32.   , 1.      , 1,      &
+     &   2,' ICNE',    0.   ,   99.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,'  FNE',    1.   ,   99.   ,-9999999.,-9999999., 1.      , 1/
+      DATA (ILEN(I),ABBR(I),FMIN1(I),FMAX1(I),FMIN2(I),FMAX2(I)               &
+     &,FUNITS(I),ITYPE(I),I=289,305)/                                         &
+     &   1,'  CEF',    0.   ,    1.   ,-9999999.,-9999999., 1.      , 1,      &
+     &  10,' ERRD',   32.   ,  126.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   4,' ARCE',   48.   ,   57.   ,   65.   ,   90.   ,-9999999., 3,      &
+     &   8,'  CDE',   48.   ,   57.   ,-9999999.,-9999999.,-9999999., 3,      &
+     &   1,' ASIE',    0.   ,    1.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,' ATTI',   98.   ,   98.   ,   98.   ,   98.   , 1.      , 1,      &
+     &   2,' ATTL',   15.   ,   15.   ,   15.   ,   15.   , 1.      , 1,      &
+     &   6,'  UID',   48.   ,   57.   ,   65.   ,   90.   ,-9999999., 3,      &
+     &   1,'  RN1',    0.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  RN2',    0.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  RN3',    0.   ,   35.   ,-9999999.,-9999999., 1.      , 2,      &
+     &   1,'  RSA',    0.   ,    2.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   1,'  IRF',    0.   ,    2.   ,-9999999.,-9999999., 1.      , 1,      &
+     &   2,' ATTI',   99.   ,   99.   ,   99.   ,   99.   , 1.      , 1,      &
+     &   2,' ATTL',    0.   ,    0.   ,    0.   ,    0.   , 1.      , 1,      &
+     &   1,' ATTE',    0.   ,    2.   ,-9999999.,-9999999., 1.      , 1,      &
+     &1024,' SUPD',   32.   ,  126.   ,-9999999.,-9999999.,-9999999., 3/
+      END
+EOR
+rm a.out
+gfortran p.f90
+date
+./a.out
