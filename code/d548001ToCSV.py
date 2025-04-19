@@ -447,7 +447,8 @@ def removeUnderscores(path):
 def main():
     preamble()
     path = fileLocations()
-    # STDtoTXT(path)
+    
+    STDtoTXT(path)
     deleteExtension(path, "STD")
 
     txtList = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and f.endswith("txt")]
