@@ -11,19 +11,20 @@ Note: this code was tested first on Linux, please make adjustments to your syste
   + pandas
   + csv
  
-## How to Use
+## How to Use the Extractor
 There are a few commands to run, and they require some setup. I've named folders in the text below for the sake of clarity, but feel free to change things to your preference.
-+ First, download ``rdmsg1_Cshell`` and ``data_cleaner.py``. Place them both in a dedicated folder, which I will denote ``FOLDER`` for the rest of this document.
-+ Next, download the data. There are two layers of extraction necessary, so after you've done that, move the bare .STD files that you wish to move to ``FOLDER``. I advise creating another subfolder (you can name it ``STDs``) inside ``FOLDER`` because of the data extraction process that needs to occur.
-+ Then move into the ``FOLDER`` directory and run the following command: ``for file in STDs/*.STD; do { csh rdmsg1_Cshell "$file"; echo "$1 $(date)" | ./a.out;} | tee "${file}.txt"; done``
-+ The terminal will proceed to read the terminal output into a .txt file and save it as a file in the same folder with the same name but with a .txt extension.
-+ Once that's done, then, in that same folder, run ``python3 data_cleaner.py``. This will create a bunch of properly formatted .csv files with the extracted data. This process usually takes a bit longer.
-+ You now have all your data in the form of csvs!
++ First, download the two files ``rdmsg1_Cshell`` and ``d548001ToCSV.py`` contained in the ``code`` folder. Place them together in the same folder.
++ Next, download the data. There are two layers of extraction necessary, so after you've done that, you have various .STD files. Choose a folder to dedicate for this purpose.
++ Open your terminal and while in the folder with the ``code`` folder, run the Python program with ``python3 d548001ToCSV.py``. Follow the necessary prompts. Please note that the path that you enter into the system is either relative or absolute but your file path cannot contain any directories with spaces. This is a FORTRAN limitation.
++ The terminal will read the terminal outputs and save every STD file as a TXT file before converting it to a proper CSV. The program is slow. Please note that if your system RAM is not sufficiently large the program will likely crash after conversion to TXT, in which case you have to open up the Python program and comment out the ``STDToCSV`` method and run it again.
++ Note that the program will remove all extraneous files produced in the process, but that it only does so after all processes have finished. Ensure you have enough memory for this before you begin.
+
+## How to Use the CSVs
+The ``csv`` folder contains 1-degree (post-1960) (12.6 GB) and 2-degree (post-1800) (7.2 GB) data, split into decade folders and each CSV containing a year and month. Columns in each CSV include Year, Month, the Running Month (Year * 12 + Month), Longitude, Latitude, and the first sextile (S1), median, fifth sextile (S5), mean, number of observations, standard deviation, mean day of the month of observance, and fraction of daylight observations for all sixteen variables in the dataset.
 
 ## Troubleshooting
-+ If something isn't working in the Python code, you can enable verbosity in data_cleaner.py on Line 25 to display what's going on in the terminal.
-+ Error messages like ``tee: 'WIP/*.STD.txt': No such file or directory`` or ``rdmsg1_Cshell: No such file or directory.`` or ``bash: ./a.out: No such file or directory`` tend to mean the command was not run in the correct folder.
-+ ``a.out: Command not found.`` can be ignored for the most part.
++ If something isn't working in the Python code, you can enable verbosity within ``d548001ToCSV.py`` to see what's going on.
++ Email ``projecthandsondeck (at) gmail (dot) com`` if there's something wrong with something in this repository here.
 
 ## Citations
 + Research Data Archive/Computational and Information Systems Laboratory/National Center for Atmospheric Research/University Corporation for Atmospheric Research, Physical Sciences Laboratory/Earth System Research Laboratory/OAR/NOAA/U.S. Department of Commerce, Cooperative Institute for Research in Environmental Sciences/University of Colorado, National Oceanography Centre/University of Southampton, Met Office/Ministry of Defence/United Kingdom, Deutscher Wetterdienst (German Meteorological Service)/Germany, Department of Atmospheric Science/University of Washington, Center for Ocean-Atmospheric Prediction Studies/Florida State University, and National Centers for Environmental Information/NESDIS/NOAA/U.S. Department of Commerce. 2016, updated monthly. _International Comprehensive Ocean-Atmosphere Data Set (ICOADS) Release 3, Monthly Summaries_. Research Data Archive at the National Center for Atmospheric Research, Computational and Information Systems Laboratory. https://doi.org/10.5065/D6V40SFD. Accessed 17 Jun 2024.
