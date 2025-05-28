@@ -6,9 +6,9 @@ Note: this code was tested first on Linux, please make adjustments to your syste
 
 Most recent data from: 2025-03
 
-ICOADS last updated: 2025-04-30
+ICOADS last updated: 2025-05-16
 
-This file last updated: 2025-05-10
+This file last updated: 2025-05-28
 
 ## Prerequisites
 + FORTRAN 77
