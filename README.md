@@ -4,11 +4,11 @@ This code is designed to pull data from the NOAA's International Comprehensive O
 
 Note: this code was tested first on Linux, please make adjustments to your system accordingly.
 
-Most recent data from: 2025-03
+Most recent data from: 2025-06
 
-ICOADS last updated: 2025-05-16
+ICOADS last updated: 2025-07-14
 
-This file last updated: 2025-05-28
+This file last updated: 2025-07-22
 
 ## Prerequisites
 + FORTRAN 77
@@ -16,7 +16,7 @@ This file last updated: 2025-05-28
 + Python
   + pandas
   + csv
- 
+
 ## How to Use the Extractor
 There are a few commands to run, and they require some setup. I've named folders in the text below for the sake of clarity, but feel free to change things to your preference.
 + First, download the two files ``rdmsg1_Cshell`` and ``d548001ToCSV.py`` contained in the ``code`` folder. Place them together in the same folder.
