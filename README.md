@@ -4,11 +4,11 @@ This code is designed to pull data from the NOAA's International Comprehensive O
 
 Note: this code was tested first on Linux, please make adjustments to your system accordingly.
 
-Most recent data from: 2025-06
+Most recent data from: 2025-07
 
-ICOADS last updated: 2025-07-14
+ICOADS last updated: 2025-08-12
 
-This file last updated: 2025-07-22
+This file last updated: 2025-08-26
 
 ## Prerequisites
 + FORTRAN 77
