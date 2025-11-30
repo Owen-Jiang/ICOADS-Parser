@@ -8,7 +8,9 @@ Most recent data from: 2025-07
 
 ICOADS last updated: 2025-08-12
 
-This file last updated: 2025-08-26
+This file last updated: 2025-11-29
+
+I have elected to bring the column names in line with current standards (see https://osdata.gdex.ucar.edu/web/datasets/d548001/docs/msg).
 
 ## Prerequisites
 + FORTRAN 77
