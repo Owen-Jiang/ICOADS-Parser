@@ -8,9 +8,9 @@ Most recent data from: 2025-07
 
 ICOADS last updated: 2025-08-12
 
-This file last updated: 2025-11-29
+This file last updated: 2025-12-01
 
-**NEWS**: I have elected to bring the column names in line with current standards (see https://osdata.gdex.ucar.edu/web/datasets/d548001/docs/msg). This should have the added bonus of reducing the file sizes by a small amount but primarily is meant to help shorten the length of column names.
+**NEWS**: I have elected to bring the column names in line with current standards (see https://osdata.gdex.ucar.edu/web/datasets/d548001/docs/msg). This should have the added bonus of reducing the file sizes by a small amount but primarily is meant to help shorten the length of column names. A parallel option to speed things up has also been added.
 
 ## Prerequisites
 + FORTRAN 77
@@ -21,17 +21,17 @@ This file last updated: 2025-11-29
 
 ## How to Use the Extractor
 There are a few commands to run, and they require some setup. I've named folders in the text below for the sake of clarity, but feel free to change things to your preference.
-+ First, download the two files ``rdmsg1_Cshell`` and ``d548001ToCSV.py`` contained in the ``code`` folder. Place them together in the same folder.
++ First, download the two files ``rdmsg1_Cshell`` and ``d548001ToCSV.py`` contained in the ``original`` folder in the ``code`` folder. Place them together in the same folder. To speed things up, you can also use the three files in the parallel folder.
 + Next, download the data. There are two layers of extraction necessary, so after you've done that, you have various .STD files. Choose a folder to dedicate for this purpose.
-+ Open your terminal and while in the folder with the ``code`` folder, run the Python program with ``python3 d548001ToCSV.py``. Follow the necessary prompts. Please note that the path that you enter into the system is either relative or absolute but your file path cannot contain any directories with spaces. This is a FORTRAN limitation.
++ Open your terminal and while in the folder with the ``code`` folder, run the Python program with ``python3 d548001ToCSV.py`` or ``python3 d548001ToCSVParallel.py``. Follow the necessary prompts. Please note that the path that you enter into the system is either relative or absolute but your file path cannot contain any directories with spaces. This is a FORTRAN limitation.
 + The terminal will read the terminal outputs and save every STD file as a TXT file before converting it to a proper CSV. The program is slow. Please note that if your system RAM is not sufficiently large the program will likely crash after conversion to TXT, in which case you have to open up the Python program and comment out the ``STDToCSV`` method and run it again.
 + Note that the program will remove all extraneous files produced in the process, but that it only does so after all processes have finished. Ensure you have enough memory for this before you begin.
 
 ## How to Use the CSVs
-The ``csv`` folder contains 1-degree (post-1960) (12.6 GB) and 2-degree (post-1800) (7.2 GB) data, split into decade folders and each CSV containing a year and month. Columns in each CSV include Year, Month, the Running Month (Year * 12 + Month), Longitude, Latitude, and the first sextile (S1), median, fifth sextile (S5), mean, number of observations, standard deviation, mean day of the month of observance, and fraction of daylight observations for all sixteen variables in the dataset.
+The ``csv`` folder contains 1-degree (post-1960) (12.9 GB) and 2-degree (post-1800) (7.0 GB) data, split into decade folders and each CSV containing a year and month. Columns in each CSV include Year, Month, the Running Month (Year * 12 + Month), Longitude, Latitude, and the first sextile (S1), median, fifth sextile (S5), mean, number of observations, standard deviation, mean day of the month of observance, and fraction of daylight observations for all sixteen variables in the dataset. For more information, see the documentation.
 
 ## Troubleshooting
-+ If something isn't working in the Python code, you can enable verbosity within ``d548001ToCSV.py`` to see what's going on.
++ If something isn't working in the Python code, you can enable verbosity within ``d548001ToCSV.py`` or ``d548001ToCSVParallel.py`` to see what's going on.
 + Email ``projecthandsondeck (at) gmail (dot) com`` if there's something wrong with something in this repository here.
 
 ## Citations
